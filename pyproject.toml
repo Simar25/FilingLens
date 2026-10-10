@@ -1,0 +1,9 @@
+[project]
+name = "filinglens"
+version = "0.1.0"
+description = "AI analyst for SEC 10-K filings: RAG + text-to-SQL + research on filing language."
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

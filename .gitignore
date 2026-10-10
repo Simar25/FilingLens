@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Secrets (your SEC contact email)
+.env
+
+# Downloaded and generated data - anyone can rebuild it by running the pipeline
+data/

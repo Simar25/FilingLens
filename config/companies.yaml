@@ -1,0 +1,25 @@
+# Which companies and years the pipeline downloads.
+# Start small (quick to run and debug), then add more tickers later.
+
+tickers:
+  - AAPL   # Apple       - fiscal year ends late September
+  - MSFT   # Microsoft   - fiscal year ends June 30
+  - NVDA   # NVIDIA      - fiscal year ends late January
+  - AMD
+  - INTC
+  - GOOGL
+  - AMZN
+  - META
+  - ORCL   # Oracle      - fiscal year ends May 31
+  - CRM    # Salesforce  - fiscal year ends January 31
+  - ADBE   # Adobe       - fiscal year ends around December 1
+  - NFLX
+  - TSLA
+  - JPM
+
+# Fiscal years to keep (inclusive).
+start_fiscal_year: 2020
+end_fiscal_year: 2025
+
+# Market index fund used later as a benchmark ("did the stock beat the market?").
+benchmark: SPY
