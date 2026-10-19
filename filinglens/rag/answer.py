@@ -52,14 +52,18 @@ class Answer:
     reply: LLMReply | None = None
 
 
-def build_prompt(question: str, sources: list[SearchResult]) -> str:
+def format_sources(sources: list[SearchResult]) -> str:
     blocks = []
     for number, source in enumerate(sources, start=1):
         attributes = (f'id="{number}" company={quoteattr(source.company)} ticker="{source.ticker}" '
                       f'fiscal_year="{source.fiscal_year}" section={quoteattr(source.section)}')
         blocks.append(f"<source {attributes}>\n{source.text}\n</source>")
+    return "\n\n".join(blocks)
+
+
+def build_prompt(question: str, sources: list[SearchResult]) -> str:
     # Sources first, question last: models answer long prompts best when the question comes at the end.
-    return "\n\n".join(blocks) + f"\n\nQuestion: {question}"
+    return format_sources(sources) + f"\n\nQuestion: {question}"
 
 
 def find_citations(text: str) -> list[int]:

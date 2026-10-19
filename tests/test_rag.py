@@ -134,27 +134,147 @@ def test_unknown_llm_provider_is_a_clear_error(monkeypatch):
         llm.current_settings()
 
 
-def test_gemini_rate_limit_is_a_clear_error(monkeypatch):
+class FakeGemini:
+    """Stands in for genai.Client: each request gives the next outcome (an exception, or reply text)."""
+
+    def __init__(self, monkeypatch, *outcomes):
+        from google import genai
+        from types import SimpleNamespace
+
+        self.outcomes, self.calls, self.waits = list(outcomes), 0, []
+        fake = self
+
+        class Client:
+            def __init__(self, **options):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc_info):
+                return False
+
+            class interactions:
+                @staticmethod
+                def create(**kwargs):
+                    fake.calls += 1
+                    outcome = fake.outcomes.pop(0)
+                    if isinstance(outcome, Exception):
+                        raise outcome
+                    usage = SimpleNamespace(total_input_tokens=10, total_output_tokens=2, total_thought_tokens=0)
+                    return SimpleNamespace(output_text=outcome, usage=usage)
+
+        monkeypatch.setattr(genai, "Client", Client)
+        monkeypatch.setattr(llm.time, "sleep", self.waits.append)  # record waits instead of waiting
+        monkeypatch.setenv("LLM_PROVIDER", "gemini")
+        monkeypatch.setenv("LLM_MODEL", "gemini-test")
+        monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+
+def gemini_error(status: int, headers: dict | None = None, message: str = "error") -> Exception:
     import httpx
-    from google import genai
     from google.genai._gaos.lib.compat_errors import APIError
 
-    response = httpx.Response(429, request=httpx.Request("POST", "https://gemini.test"))
+    response = httpx.Response(status, headers=headers, request=httpx.Request("POST", "https://gemini.test"))
+    return APIError.generate(status, {"error": {"message": message}}, None, response)
 
-    class FakeClient:  # stands in for genai.Client, so no network call is made
-        def __enter__(self):
-            return self
 
-        def __exit__(self, *exc_info):
-            return False
-
-        class interactions:
-            @staticmethod
-            def create(**kwargs):
-                raise APIError.generate(429, None, "Resource exhausted", response)
-
-    monkeypatch.setattr(genai, "Client", FakeClient)
-    monkeypatch.setenv("LLM_PROVIDER", "gemini")
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+def test_gemini_rate_limit_is_a_clear_error(monkeypatch):
+    fake = FakeGemini(monkeypatch, *[gemini_error(429)] * 3)  # a per-minute limit that doesn't clear
     with pytest.raises(llm.LLMError, match="free-tier limit"):
         llm.generate("system", "prompt")
+    assert (fake.calls, fake.waits) == (3, [2, 5])
+
+
+def test_daily_limit_stops_at_once_instead_of_sleeping_for_hours(monkeypatch):
+    # The real reply seen on 2026-10-19. The client library used to sleep the 49,340 s it asks for.
+    daily = gemini_error(429, {"retry-after": "49340"}, "limit: 20 requests per day on Free Tier. "
+                                                         "Please retry in 13h42m20s")
+    fake = FakeGemini(monkeypatch, daily)
+    with pytest.raises(llm.LLMError, match="used up. Gemini says: limit: 20 requests per day"):
+        llm.generate("system", "prompt")
+    assert (fake.calls, fake.waits) == (1, [])
+
+
+def test_a_short_requested_wait_is_waited_out(monkeypatch):
+    fake = FakeGemini(monkeypatch, gemini_error(429, {"retry-after": "1"}), "the answer")
+    assert llm.generate("system", "prompt").text == "the answer"
+    assert (fake.calls, fake.waits) == (2, [1.0])
+
+
+def test_gemini_overload_and_timeout_are_clear_errors(monkeypatch):
+    import httpx
+    from google.genai._gaos.lib.compat_errors import APITimeoutError
+
+    FakeGemini(monkeypatch, *[gemini_error(503)] * 3)
+    with pytest.raises(llm.LLMError, match="overloaded"):
+        llm.generate("system", "prompt")
+
+    FakeGemini(monkeypatch, APITimeoutError(httpx.Request("POST", "https://gemini.test")))
+    with pytest.raises(llm.LLMError, match="didn't answer within"):
+        llm.generate("system", "prompt")
+
+
+class FakeGroq:
+    """Stands in for requests.post to Groq: each call gives the next (status, body, headers) reply."""
+
+    def __init__(self, monkeypatch, *replies):
+        import json
+
+        import requests
+
+        self.replies, self.requests, self.waits = list(replies), [], []
+
+        def post(url, json=None, timeout=None, headers=None):
+            self.requests.append(json)
+            status, body, extra_headers = self.replies.pop(0)
+            response = requests.Response()
+            response.status_code, response._content = status, _json.dumps(body).encode()
+            response.headers.update(extra_headers or {})
+            return response
+
+        _json = json
+        monkeypatch.setattr(llm.requests, "post", post)
+        monkeypatch.setattr(llm.time, "sleep", self.waits.append)
+        monkeypatch.setenv("LLM_PROVIDER", "groq")
+        monkeypatch.delenv("LLM_MODEL", raising=False)
+        monkeypatch.setenv("GROQ_API_KEY", "test-key")
+
+
+GROQ_OK = (200, {"choices": [{"message": {"content": "the answer"}}],
+                 "usage": {"prompt_tokens": 50, "completion_tokens": 7}}, None)
+
+
+def test_groq_answers_with_medium_reasoning(monkeypatch):
+    fake = FakeGroq(monkeypatch, GROQ_OK)
+    reply = llm.generate("system", "prompt")
+    assert (reply.text, reply.model, reply.input_tokens, reply.output_tokens) == (
+        "the answer", "openai/gpt-oss-120b", 50, 7)
+    assert fake.requests[0]["reasoning_effort"] == "medium"
+
+
+def test_groq_per_minute_limit_is_waited_out(monkeypatch):
+    fake = FakeGroq(monkeypatch, (429, {"error": {"message": "tokens per minute"}}, {"retry-after": "7"}), GROQ_OK)
+    assert llm.generate("system", "prompt").text == "the answer"
+    assert fake.waits == [7.0]
+
+
+def test_groq_daily_limit_stops_at_once(monkeypatch):
+    fake = FakeGroq(monkeypatch, (429, {"error": {"message": "tokens per day (TPD): Limit 200000"}},
+                                  {"retry-after": "3600"}))
+    with pytest.raises(llm.LLMError, match="used up. Groq says: tokens per day"):
+        llm.generate("system", "prompt")
+    assert (len(fake.requests), fake.waits) == (1, [])
+
+
+def test_groq_prompt_too_large_suggests_fewer_passages(monkeypatch):
+    FakeGroq(monkeypatch, (413, {"error": {"message": "Request too large: Limit 8000, Requested 9500"}}, None))
+    with pytest.raises(llm.LLMError, match="-k 4"):
+        llm.generate("system", "prompt")
+
+
+def test_model_quirks_are_cleaned():
+    # What gpt-oss on Groq really sent on 2026-10-19 (plus its longer citation form).
+    raw = ("fiscal\u202f2024, **$108.81\u202fbillion**\u3010DB\u3011 because of year\u2011over\u2011year "
+           "demand\u30102\u2020L1-L3\u3011.")
+    assert llm.clean_text(raw) == "fiscal 2024, **$108.81 billion**[DB] because of year-over-year demand[2]."

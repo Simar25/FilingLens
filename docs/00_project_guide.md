@@ -8,7 +8,7 @@ This is the full plan, from an empty folder to a deployed app on your resume. Ti
  Step 0  Setup                       DONE
  Step 1  Data pipeline               DONE
  Step 2  Read the reports + RAG      <- in progress (code built; your checks next)
- Step 3  Text-to-SQL + router
+ Step 3  Text-to-SQL + router        <- in progress (code built; your checks next)
  Step 4  Research study
  Step 5  Evaluation + better search
  Step 6  Web app + deployment
@@ -123,6 +123,16 @@ The code will hide the choice behind one small `llm.py` file, so you can switch 
 **Goal:** handle number questions accurately (*"Compare NVIDIA's and AMD's gross margins since 2021"*) and mixed questions (*"How did Apple's R&D spending change, and why?"*).
 
 **Why:** LLMs are bad at arithmetic and at remembering exact figures. For numbers, the AI should write a database query and let the database answer. Deciding which path a question needs is called routing.
+
+**Built:** the `ask` command now routes every question itself. Try the three kinds:
+
+```
+.\.venv\Scripts\python.exe -m filinglens.ask "Compare NVIDIA's and AMD's gross margins since 2021"
+.\.venv\Scripts\python.exe -m filinglens.ask "What supply chain risks did Apple describe in 2024?"
+.\.venv\Scripts\python.exe -m filinglens.ask "How did Apple's R&D spending change since 2021, and why?"
+```
+
+Each answer prints the route, the SQL, the result table and the time of each stage; trend questions open a chart in your browser. Everything is explained in `docs/03_text_to_sql.md`.
 
 ### What gets built
 

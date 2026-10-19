@@ -15,3 +15,7 @@ google-genai>=2.0
 # PyTorch for your NVIDIA GPU: install it BEFORE this file, from PyTorch's own server
 # (plain `pip install torch` gives the slower CPU-only version on Windows):
 #   pip install torch --index-url https://download.pytorch.org/whl/cu130
+
+# Step 3: text-to-SQL and charts
+sqlglot>=30.0
+plotly>=6.0

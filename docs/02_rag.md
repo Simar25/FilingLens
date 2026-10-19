@@ -131,6 +131,7 @@ Two smaller choices: the sources come *before* the question (models handle long 
 | `LLM_PROVIDER` | Model (default) | Cost | Notes |
 |---|---|---|---|
 | `gemini` (default) | `gemini-3.8-flash` | Free tier | Needs a free `GEMINI_API_KEY`. The free tier has per-minute and per-day request limits (see your limits in Google AI Studio). If you hit them, `LLM_MODEL=gemini-3.5-flash-lite` has higher limits. Google may use free-tier prompts to improve its products. That's fine here, since 10-Ks are public. |
+| `groq` | `openai/gpt-oss-120b` | Free tier | Added in Step 3, when Gemini's daily limit ran out (see `docs/03_text_to_sql.md`, finding 2). Needs a free `GROQ_API_KEY` from console.groq.com. Free tier: about 1,000 requests and 200,000 tokens a day, but only 8,000 tokens a minute, so asking several long questions in a row can make it wait a moment. |
 | `ollama` | `llama3.1:8b` | Free, unlimited | Runs on your GPU. Install from ollama.com, then `ollama pull llama3.1:8b`. Slower and weaker at following the citation rules. |
 
 Gemini's "thinking" is set to `low`: answering from 8 given passages doesn't need deep reasoning, and thinking tokens count against free-tier limits. For Ollama, the context window is raised to 8,192 tokens. Ollama's default is smaller, and it silently drops the *start* of longer prompts, which is exactly where the sources are.

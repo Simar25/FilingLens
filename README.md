@@ -16,7 +16,7 @@ FilingLens combines three things:
 |---|---|---|
 | 1 | Data pipeline: SEC filings, financials and stock prices into DuckDB | Done |
 | 2 | Split reports into sections; RAG with citations | Built, being checked |
-| 3 | Text-to-SQL, query router, charts | Planned |
+| 3 | Text-to-SQL with safety checks, query router, charts | Built, being checked |
 | 4 | Research study: report language vs. stock returns | Planned |
 | 5 | Evaluation set; hybrid search + reranker | Planned |
 | 6 | Streamlit app, Docker, deployment | Planned |
@@ -57,7 +57,9 @@ copy .env.example .env            # macOS/Linux: cp .env.example .env
 python -m filinglens.pipeline        # downloads everything, about 5 minutes the first time
 python -m filinglens.parse_reports   # reports -> sections -> chunks
 python -m filinglens.build_index     # chunks -> vectors in ChromaDB (uses the GPU)
-python -m filinglens.ask "What supply chain risks did Apple describe in 2024?"
+python -m filinglens.ask "What supply chain risks did Apple describe in 2024?"      # text -> RAG
+python -m filinglens.ask "Compare NVIDIA's and AMD's gross margins since 2021"     # numbers -> SQL + chart
+python -m filinglens.ask "How did Apple's R&D spending change since 2021, and why?" # both
 pytest                               # runs the tests
 ```
 
@@ -102,8 +104,16 @@ FilingLens/
 │   ├── database.py            DuckDB tables, loading, financials_wide view
 │   ├── parse_reports.py       Step 2: reports -> sections and chunks
 │   ├── build_index.py         Step 2: chunks -> embeddings in ChromaDB
-│   ├── ask.py                 Step 2: question -> cited answer
+│   ├── ask.py                 the `ask` command: prints route, SQL, table, answer, sources
+│   ├── assistant.py           Step 3: route -> SQL and/or RAG -> answer -> chart
+│   ├── router.py              Step 3: numbers, text or both?
+│   ├── combine.py             Step 3: one answer from the SQL table + passages, citing [DB] and [n]
+│   ├── charts.py              Step 3: line chart for trend results (Plotly)
 │   ├── llm.py                 the one place that calls the LLM (Gemini or Ollama)
+│   ├── sql/
+│   │   ├── schema.py          what the tables and columns mean, for the LLM
+│   │   ├── text_to_sql.py     question -> SQL, one retry with the error
+│   │   └── safety.py          parse-tree check, locked-down connection, time and row limits
 │   ├── text/
 │   │   ├── html_to_text.py    10-K web page -> clean text
 │   │   ├── sections.py        text -> Items (1A Risk Factors, 7 MD&A, ...)
@@ -128,3 +138,4 @@ FilingLens/
 - [Complete step-by-step guide](docs/00_project_guide.md), the full plan from setup to deployment
 - [Step 1: data pipeline](docs/01_data_pipeline.md), with how it works and why it's built this way
 - [Step 2: reading the reports and RAG](docs/02_rag.md)
+- [Step 3: text-to-SQL, the router and charts](docs/03_text_to_sql.md)
