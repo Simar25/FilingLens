@@ -7,7 +7,7 @@ This is the full plan, from an empty folder to a deployed app on your resume. Ti
 ```
  Step 0  Setup                       DONE
  Step 1  Data pipeline               DONE
- Step 2  Read the reports + RAG      <- next
+ Step 2  Read the reports + RAG      <- in progress (code built; your checks next)
  Step 3  Text-to-SQL + router
  Step 4  Research study
  Step 5  Evaluation + better search
@@ -38,7 +38,7 @@ Work on your laptop, not Google Colab. Your RTX 4060 GPU handles every AI model 
 
 ## Step 1: Data pipeline (done)
 
-**Built:** one command (`python -m filinglens.pipeline`) downloads SEC annual reports, financial numbers and daily stock prices for 12 companies over 6 years into one DuckDB database file.
+**Built:** one command (`python -m filinglens.pipeline`) downloads SEC annual reports, financial numbers and daily stock prices for 14 companies over 6 years into one DuckDB database file.
 
 ### How to run a command (do this once)
 
@@ -87,7 +87,7 @@ Your checklist:
 |---|---|---|---|
 | 2.1 | Clean the HTML | Turns each 10-K web page into plain text, removing hidden XBRL data, page numbers and navigation | BeautifulSoup, lxml |
 | 2.2 | Split into sections | Finds the standard parts: Item 1 Business, 1A Risk Factors, 7 MD&A (management's discussion), 7A Market Risk. The table of contents mentions these too, so it has to find the real ones. | Regular expressions |
-| 2.3 | Chunking | Cuts each section into passages of about 400 words, with a small overlap so sentences aren't cut off from their context. Each chunk remembers its company, year and section. | Python |
+| 2.3 | Chunking | Cuts each section into passages of up to 300 words (about 400 tokens), with a small overlap so sentences aren't cut off from their context. Each chunk remembers its company, year and section. | Python |
 | 2.4 | Embeddings | Turns each chunk into a list of numbers (a vector) that captures its meaning, so similar meanings get similar vectors. Runs on your GPU. | sentence-transformers, PyTorch (GPU version) |
 | 2.5 | Vector database | Stores the vectors so the closest matches to a question can be found in milliseconds, filtered by company and year | ChromaDB |
 | 2.6 | Answering | Finds the top chunks, gives them to an LLM with instructions to answer only from them and cite them as [1], [2]… | An LLM (see decision below) |
@@ -103,6 +103,8 @@ New database tables: `sections` (one row per report section) and `chunks` (one r
 | **Local model with Ollama** (7–8B model) | Free | Good | Runs on your RTX 4060. Can't run in the free deployed app (no GPU there). |
 
 The code will hide the choice behind one small `llm.py` file, so you can switch at any time.
+
+**Decided:** the Gemini API (free tier, `gemini-3.8-flash`), with Ollama kept as a free local option. See `docs/02_rag.md`, section 2.6.
 
 ### Your checklist
 - [ ] Run the parsing step and open a few sections in DuckDB: do they start and end in the right places?
@@ -151,7 +153,7 @@ The code will hide the choice behind one small `llm.py` file, so you can switch 
 **Why:** this is the data science half of the project: hypothesis, features, statistics and honest conclusions.
 
 ### Before you start: get more companies
-12 companies × 5 years is only about 60 data points, too few for statistics. Add 50–90 more companies from different industries to `config/companies.yaml` and re-run the pipeline (about 30–60 minutes the first time).
+14 companies × 5 years is only about 70 data points, too few for statistics. Add 50–90 more companies from different industries to `config/companies.yaml` and re-run the pipeline (about 30–60 minutes the first time).
 
 ### What gets built
 

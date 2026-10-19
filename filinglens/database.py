@@ -47,6 +47,29 @@ CREATE TABLE IF NOT EXISTS financials (
     PRIMARY KEY (ticker, fiscal_year, metric)
 );
 
+CREATE TABLE IF NOT EXISTS sections (
+    accession_number VARCHAR NOT NULL,     -- which 10-K the section comes from
+    ticker           VARCHAR NOT NULL,
+    fiscal_year      INTEGER NOT NULL,
+    item             VARCHAR NOT NULL,     -- '1A', '7', ... or 'AR' (attached annual report)
+    title            VARCHAR NOT NULL,     -- 'Risk Factors', ...
+    text             VARCHAR NOT NULL,
+    n_words          INTEGER NOT NULL,
+    PRIMARY KEY (accession_number, item)
+);
+
+CREATE TABLE IF NOT EXISTS chunks (
+    chunk_id         VARCHAR PRIMARY KEY,  -- e.g. 'AAPL-2024-1A-0007'
+    accession_number VARCHAR NOT NULL,
+    ticker           VARCHAR NOT NULL,
+    fiscal_year      INTEGER NOT NULL,
+    item             VARCHAR NOT NULL,
+    title            VARCHAR NOT NULL,
+    chunk_index      INTEGER NOT NULL,     -- position within its section
+    text             VARCHAR NOT NULL,
+    n_words          INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS prices (
     ticker  VARCHAR NOT NULL,
     date    DATE NOT NULL,

@@ -5,3 +5,13 @@ yfinance>=0.2.54
 python-dotenv>=1.0
 pyyaml>=6.0
 pytest>=8.0
+
+# Step 2: reading reports and RAG
+beautifulsoup4>=4.12
+lxml>=5.0
+sentence-transformers>=5.0
+chromadb>=1.0
+google-genai>=2.0
+# PyTorch for your NVIDIA GPU: install it BEFORE this file, from PyTorch's own server
+# (plain `pip install torch` gives the slower CPU-only version on Windows):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu130

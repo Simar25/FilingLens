@@ -15,7 +15,7 @@ FilingLens combines three things:
 | Step | What | Status |
 |---|---|---|
 | 1 | Data pipeline: SEC filings, financials and stock prices into DuckDB | Done |
-| 2 | Split reports into sections; RAG with citations | Next |
+| 2 | Split reports into sections; RAG with citations | Built, being checked |
 | 3 | Text-to-SQL, query router, charts | Planned |
 | 4 | Research study: report language vs. stock returns | Planned |
 | 5 | Evaluation set; hybrid search + reranker | Planned |
@@ -47,13 +47,18 @@ Requires Python 3.10+.
 ```bash
 python -m venv .venv
 .venv\Scripts\activate            # Windows  (macOS/Linux: source .venv/bin/activate)
+pip install torch --index-url https://download.pytorch.org/whl/cu130   # GPU version of PyTorch (NVIDIA)
 pip install -r requirements.txt
 
 copy .env.example .env            # macOS/Linux: cp .env.example .env
-# then edit .env and put your name and email in SEC_USER_AGENT (SEC requires it)
+# then edit .env: your name and email in SEC_USER_AGENT (SEC requires it),
+# and a free Gemini key in GEMINI_API_KEY (https://aistudio.google.com/apikey)
 
-python -m filinglens.pipeline     # downloads everything, about 5 minutes the first time
-pytest                            # runs the tests
+python -m filinglens.pipeline        # downloads everything, about 5 minutes the first time
+python -m filinglens.parse_reports   # reports -> sections -> chunks
+python -m filinglens.build_index     # chunks -> vectors in ChromaDB (uses the GPU)
+python -m filinglens.ask "What supply chain risks did Apple describe in 2024?"
+pytest                               # runs the tests
 ```
 
 Useful options: `--tickers AAPL NVDA` (just these companies), `--skip-documents` (numbers only, no report files), `--refresh` (pick up newly published reports).
@@ -79,6 +84,10 @@ Everything lives in one DuckDB file, `data/processed/filinglens.duckdb`:
 | `financials` | company, year, metric | metric, value, unit, xbrl_tag, accession_number |
 | `prices` | company, trading day | close (adjusted), volume |
 | `financials_wide` (view) | company, year | revenue, net_income, ..., gross_margin, net_margin, revenue_growth |
+| `sections` | 10-K section (Item) | ticker, fiscal_year, item ('1A', '7', ...), title, text, n_words |
+| `chunks` | ~250-word passage | chunk_id, ticker, fiscal_year, item, chunk_index, text |
+
+The chunks' embeddings live in a ChromaDB vector database in `data/processed/chroma/`.
 
 Every financial value records which XBRL tag and which filing it came from, so any number can be traced back to its source.
 
@@ -91,6 +100,19 @@ FilingLens/
 │   ├── config.py              settings and folder paths
 │   ├── pipeline.py            runs the whole data pipeline
 │   ├── database.py            DuckDB tables, loading, financials_wide view
+│   ├── parse_reports.py       Step 2: reports -> sections and chunks
+│   ├── build_index.py         Step 2: chunks -> embeddings in ChromaDB
+│   ├── ask.py                 Step 2: question -> cited answer
+│   ├── llm.py                 the one place that calls the LLM (Gemini or Ollama)
+│   ├── text/
+│   │   ├── html_to_text.py    10-K web page -> clean text
+│   │   ├── sections.py        text -> Items (1A Risk Factors, 7 MD&A, ...)
+│   │   └── chunking.py        sections -> overlapping ~300-word passages
+│   ├── rag/
+│   │   ├── embeddings.py      text -> vectors (bge-base, on the GPU)
+│   │   ├── vector_store.py    ChromaDB: store and search vectors with filters
+│   │   ├── filters.py         which companies and years a question is about
+│   │   └── answer.py          prompt with numbered sources, citation check
 │   └── ingest/
 │       ├── sec_client.py      polite SEC downloader: rate limit, retries, cache
 │       ├── companies.py       ticker -> SEC company ID (CIK)
@@ -105,3 +127,4 @@ FilingLens/
 
 - [Complete step-by-step guide](docs/00_project_guide.md), the full plan from setup to deployment
 - [Step 1: data pipeline](docs/01_data_pipeline.md), with how it works and why it's built this way
+- [Step 2: reading the reports and RAG](docs/02_rag.md)
