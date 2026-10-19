@@ -17,7 +17,7 @@ This is the full plan, from an empty folder to a deployed app on your resume. Ti
 
 ## How we work on each step
 
-1. **Claude writes the code** and explains it, the same way as Step 1.
+1. **Write the code** for the step, with an explanation of what each part does and why, the same way as Step 1.
 2. **You run it** on your laptop and check the results look right.
 3. **You read** that step's guide in `docs/` and do its short exercises. This is what lets you explain the project in an interview, so don't skip it.
 4. **You ask** about anything unclear, e.g. "explain `chunk_text` line by line".
@@ -32,7 +32,7 @@ Work on your laptop, not Google Colab. Your RTX 4060 GPU handles every AI model 
 - [x] Project folder `E:\FilingLens` with a private Python environment (`.venv`)
 - [x] Settings in `config/companies.yaml`, SEC contact email in `.env` (never uploaded)
 - [ ] Install the VS Code extensions **Python** and **Jupyter**
-- [ ] Create a GitHub account (if you don't have one) and ask Claude to set up the repository and first commit
+- [ ] Create a GitHub account (if you don't have one), set up the repository and make the first commit
 
 ---
 
