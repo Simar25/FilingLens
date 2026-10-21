@@ -18,6 +18,7 @@ FilingLens combines three things:
 | 2 | Split reports into sections; RAG with citations | Built, being checked |
 | 3 | Text-to-SQL with safety checks, query router, charts | Built, being checked |
 | 4 | Research study: report language vs. stock returns (99 companies) | Built, being checked |
+| 4b | India pilot: annual reports of 10 NSE companies (PDFs) | Pilot built, being checked |
 | 5 | Evaluation set; hybrid search + reranker | Planned |
 | 6 | Streamlit app, Docker, deployment | Planned |
 
@@ -76,6 +77,7 @@ Companies and years are set in [`config/companies.yaml`](config/companies.yaml).
 | Financial statements | SEC XBRL "companyfacts" API | Free |
 | Daily stock prices (split/dividend adjusted) | Yahoo Finance via `yfinance` | Free |
 | Sector and industry labels | Yahoo Finance via `yfinance` | Free |
+| Indian annual reports (pilot) | NSE website (PDFs) | Free |
 
 ## Database
 
@@ -139,6 +141,10 @@ FilingLens/
 │   │   ├── analysis.py        correlations, quintiles, regressions, robustness grid
 │   │   ├── plots.py           the charts (matplotlib, saved to docs/images/)
 │   │   └── build.py           computes everything above into DuckDB
+│   ├── india/                 India pilot: NSE annual reports
+│   │   ├── nse.py             polite, resumable NSE downloader with completeness checks
+│   │   ├── report_text.py     PDF -> MD&A (bookmarks, headings, page furniture removal)
+│   │   └── pilot.py           10 companies x 4 years -> MD&A text and change scores
 │   └── ingest/
 │       ├── sec_client.py      polite SEC downloader: rate limit, retries, cache
 │       ├── companies.py       ticker -> SEC company ID (CIK)
@@ -158,3 +164,4 @@ FilingLens/
 - [Step 2: reading the reports and RAG](docs/02_rag.md)
 - [Step 3: text-to-SQL, the router and charts](docs/03_text_to_sql.md)
 - [Step 4: research study, findings](docs/04_research_findings.md)
+- [India pilot: can FilingLens read Indian annual reports?](docs/04b_india_pilot.md)

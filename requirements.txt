@@ -27,3 +27,6 @@ scipy>=1.13             # correlations and t-tests
 statsmodels>=0.14       # regressions with clustered standard errors
 matplotlib>=3.9         # charts saved as PNG for docs/ and the notebook
 ipykernel>=6.29         # runs notebooks/04_research_study.ipynb in VS Code
+
+# India pilot: annual reports from NSE are PDFs
+pymupdf>=1.24           # PDF text and bookmarks (license: AGPL-3.0 or commercial)
