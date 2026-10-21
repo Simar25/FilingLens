@@ -13,13 +13,23 @@ import pandas as pd
 
 from filinglens.config import DB_PATH
 
-TABLES = ("companies", "filings", "financials", "prices")
+TABLES = ("companies", "company_info", "filings", "financials", "prices")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS companies (
     ticker  VARCHAR PRIMARY KEY,
     cik     INTEGER NOT NULL,          -- SEC's permanent company ID
     name    VARCHAR NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS company_info (
+    ticker     VARCHAR PRIMARY KEY,
+    sector     VARCHAR,                    -- Yahoo Finance's sector, e.g. 'Technology'
+    industry   VARCHAR,                    -- e.g. 'Semiconductors'
+    market_cap DOUBLE,                     -- USD, on the as_of day (not known in the past!)
+    employees  INTEGER,
+    country    VARCHAR,
+    as_of      DATE NOT NULL               -- the day these labels were downloaded
 );
 
 CREATE TABLE IF NOT EXISTS filings (
@@ -68,6 +78,56 @@ CREATE TABLE IF NOT EXISTS chunks (
     chunk_index      INTEGER NOT NULL,     -- position within its section
     text             VARCHAR NOT NULL,
     n_words          INTEGER NOT NULL
+);
+
+-- Step 4: the research study's measures (made by python -m filinglens.research.build)
+CREATE TABLE IF NOT EXISTS text_change (
+    ticker                VARCHAR NOT NULL,
+    fiscal_year           INTEGER NOT NULL,
+    item                  VARCHAR NOT NULL,  -- '1A' Risk Factors or '7' MD&A
+    accession_number      VARCHAR NOT NULL,  -- this year's report
+    prev_accession_number VARCHAR NOT NULL,  -- last year's report
+    n_words               INTEGER NOT NULL,
+    prev_n_words          INTEGER NOT NULL,
+    sim_cosine            DOUBLE,            -- similarity to last year, 0 to 1 (word counts)
+    sim_jaccard           DOUBLE,            -- (word sets)
+    sim_embedding         DOUBLE,            -- (meaning: chunk embeddings)
+    change_cosine         DOUBLE,            -- 1 - similarity: higher = changed more
+    change_jaccard        DOUBLE,
+    change_embedding      DOUBLE,
+    PRIMARY KEY (accession_number, item)
+);
+
+CREATE TABLE IF NOT EXISTS tone (
+    accession_number VARCHAR PRIMARY KEY,
+    ticker           VARCHAR NOT NULL,
+    fiscal_year      INTEGER NOT NULL,
+    n_sentences      INTEGER NOT NULL,       -- MD&A sentences scored by FinBERT
+    tone             DOUBLE NOT NULL,        -- mean P(positive) - P(negative), -1 to 1
+    positive_share   DOUBLE NOT NULL,        -- share of sentences labelled positive
+    negative_share   DOUBLE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS future_returns (
+    accession_number  VARCHAR PRIMARY KEY,
+    ticker            VARCHAR NOT NULL,
+    fiscal_year       INTEGER NOT NULL,
+    filing_date       DATE NOT NULL,
+    start_date        DATE,                  -- first trading day after the filing date
+    ret_3m DOUBLE, market_3m DOUBLE, abnormal_3m DOUBLE,      -- stock, SPY, stock - SPY (fractions)
+    ret_6m DOUBLE, market_6m DOUBLE, abnormal_6m DOUBLE,      -- NULL until the window is complete
+    ret_12m DOUBLE, market_12m DOUBLE, abnormal_12m DOUBLE,
+    past_abnormal_12m DOUBLE                 -- the 12 months before the filing (momentum)
+);
+
+CREATE TABLE IF NOT EXISTS topic_mentions (
+    accession_number VARCHAR NOT NULL,
+    ticker           VARCHAR NOT NULL,
+    fiscal_year      INTEGER NOT NULL,
+    topic            VARCHAR NOT NULL,       -- e.g. 'Artificial intelligence'
+    mentions         INTEGER NOT NULL,
+    n_words          INTEGER NOT NULL,       -- words in the whole report
+    PRIMARY KEY (accession_number, topic)
 );
 
 CREATE TABLE IF NOT EXISTS prices (

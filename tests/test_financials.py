@@ -133,6 +133,22 @@ def test_falls_back_to_next_tag_when_preferred_is_missing():
     assert tags == {2017: "SalesRevenueNet", 2018: "RevenueFromContractWithCustomerExcludingAssessedTax"}
 
 
+def test_net_income_fallback_only_fills_missing_years():
+    # Like Caterpillar: "NetIncomeLoss" until 2024, then only "ProfitLoss" (which includes
+    # minority interests). The fallback must fill 2025 without replacing 2024.
+    facts = {"facts": {"us-gaap": {
+        "NetIncomeLoss": {"units": {"USD": [
+            fact("2024-01-01", "2024-12-31", 10, "A24", 2024, "2025-02-01")]}},
+        "ProfitLoss": {"units": {"USD": [
+            fact("2024-01-01", "2024-12-31", 11, "A25", 2025, "2026-02-01"),
+            fact("2025-01-01", "2025-12-31", 12, "A25", 2025, "2026-02-01")]}},
+    }}}
+    df, _ = extract_annual_financials(facts, "X")
+    net_income = metric_by_year(df, "net_income")
+    assert net_income["value"].to_dict() == {2024: 10, 2025: 12}
+    assert net_income["xbrl_tag"].to_dict() == {2024: "NetIncomeLoss", 2025: "ProfitLoss"}
+
+
 def test_company_without_data():
     df, year_by_accession = extract_annual_financials({"facts": {}}, "X")
     assert df.empty and year_by_accession == {}

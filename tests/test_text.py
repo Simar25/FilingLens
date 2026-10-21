@@ -59,6 +59,15 @@ def test_title_on_the_next_line_counts():
     assert [s.item for s in sections] == ["1A"]
 
 
+def test_title_on_the_next_line_counts_after_other_words():
+    # Bank of America: a page header shares the heading line, the title is on the next line.
+    # Until this was fixed its MD&A was only a 38-word table-of-contents entry.
+    text = (TABLE_OF_CONTENTS + "Item 7. Bank of America Corporation and Subsidiaries\n"
+            f"Management's Discussion and Analysis of Financial Condition\n{body(500)}")
+    sections = {s.item: s for s in split_sections(text)}
+    assert sections["7"].n_words > 500
+
+
 def test_combined_items_heading():
     sections = split_sections(f"Items 1 and 2. Business and Properties\n{body(100)}")
     assert [s.item for s in sections] == ["1"]

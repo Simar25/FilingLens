@@ -9,7 +9,7 @@ This is the full plan, from an empty folder to a deployed app on your resume. Ti
  Step 1  Data pipeline               DONE
  Step 2  Read the reports + RAG      <- in progress (code built; your checks next)
  Step 3  Text-to-SQL + router        <- in progress (code built; your checks next)
- Step 4  Research study
+ Step 4  Research study              <- in progress (code built; your checks next)
  Step 5  Evaluation + better search
  Step 6  Web app + deployment
  Final   Resume, demo, interview prep
@@ -279,6 +279,6 @@ Example of the table you'll produce (your real numbers will differ):
 |---|---|
 | 2 | beautifulsoup4, lxml, sentence-transformers, torch (GPU build), chromadb, an LLM client or Ollama |
 | 3 | sqlglot, plotly |
-| 4 | transformers (FinBERT), statsmodels, scikit-learn, jupyter |
+| 4 | transformers (FinBERT), statsmodels, scikit-learn, scipy, matplotlib, ipykernel (notebooks) |
 | 5 | rank-bm25, a cross-encoder reranker model |
 | 6 | fastapi, uvicorn, streamlit, Docker Desktop |

@@ -9,8 +9,8 @@ to know what the columns MEAN:
 
 Most of this is written by hand below, because the meaning isn't stored in
 the database. The rest (which companies exist, when their fiscal years end,
-which years and dates are available) is read from the database, so it stays
-correct when you add companies in Step 4.
+which years and dates are available, which sectors exist) is read from the
+database, so it stays correct when you add companies in Step 4.
 
 Only the tables in ALLOWED_TABLES are described, and safety.py refuses
 queries that use any other table. The report text (`sections`, `chunks`) is
@@ -19,7 +19,7 @@ left out on purpose: questions about wording go to RAG instead.
 
 import duckdb
 
-ALLOWED_TABLES = ("financials_wide", "financials", "companies", "filings", "prices")
+ALLOWED_TABLES = ("financials_wide", "financials", "companies", "company_info", "filings", "prices")
 
 TABLES = """\
 Table financials_wide: one row per company and fiscal year. Use it for almost every question about financial numbers.
@@ -53,6 +53,13 @@ for dividends_paid (not in financials_wide) or to show where a number came from.
 
 Table companies: one row per company.
   ticker VARCHAR, cik INTEGER (SEC's company ID), name VARCHAR (official SEC name)
+
+Table company_info: one row per company, labels from Yahoo Finance. Use it for questions about a sector or industry
+("banks", "tech companies"): JOIN company_info USING (ticker).
+  ticker VARCHAR, sector VARCHAR, industry VARCHAR (e.g. 'Semiconductors', 'Banks - Diversified'),
+  market_cap DOUBLE (USD, TODAY's value on the as_of date: never use it for past years), employees INTEGER,
+  country VARCHAR, as_of DATE
+  sector is one of: {sectors}
 
 Table filings: one row per 10-K annual report.
   ticker, fiscal_year, form, filing_date DATE (the day it was made public), report_date DATE (last day of the fiscal
@@ -89,8 +96,11 @@ def describe_schema(con: duckdb.DuckDBPyConnection) -> str:
     """).fetchall()
     first_year, last_year = con.execute("SELECT MIN(fiscal_year), MAX(fiscal_year) FROM financials").fetchone()
     first_day, last_day = con.execute("SELECT MIN(date), MAX(date) FROM prices").fetchone()
+    sectors = [f"'{row[0]}'" for row in con.execute(
+        "SELECT DISTINCT sector FROM company_info WHERE sector IS NOT NULL ORDER BY 1").fetchall()]
 
-    lines = [TABLES.format(metrics=", ".join(metrics)), "", "Companies (ticker: SEC name, when its fiscal year ends):"]
+    tables = TABLES.format(metrics=", ".join(metrics), sectors=", ".join(sectors) or "(no labels downloaded yet)")
+    lines = [tables, "", "Companies (ticker: SEC name, when its fiscal year ends):"]
     for ticker, name, year, year_end in companies:
         ends = f"FY{year} ended {year_end}" if year_end else "no reports"
         lines.append(f"  {ticker}: {name} ({ends})")

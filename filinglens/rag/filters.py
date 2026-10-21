@@ -6,7 +6,10 @@ from Microsoft or from 2021, because many reports use similar wording.
 
 Simple rules are enough here:
   - Companies: the ticker in capitals (AAPL), the company's name (Apple),
-    or a common nickname (Google, Facebook).
+    or a common nickname (Google, Facebook, J&J).
+    With 99 companies (Step 4), many names start with an everyday word
+    ("Home Depot", "Public Storage", "Enterprise Products"), so those first
+    words don't count on their own: "work from home" isn't Home Depot.
   - Years: "2024", "FY24", "2021-2023", "2021 to 2023", "since 2021".
 The `ask` command prints what it detected, and --ticker / --year override it.
 """
@@ -15,11 +18,28 @@ import re
 from dataclasses import dataclass, field
 
 # Names people use that aren't part of the SEC company name.
-NICKNAMES = {"google": "GOOGL", "facebook": "META", "jp morgan": "JPM"}
+NICKNAMES = {
+    "google": "GOOGL", "facebook": "META", "jp morgan": "JPM", "j.p. morgan": "JPM",
+    "disney": "DIS", "t-mobile": "TMUS", "at&t": "T", "mcdonald's": "MCD", "lowe's": "LOW",
+    "booking holdings": "BKNG", "coca-cola": "KO", "coke": "KO", "p&g": "PG", "philip morris": "PM",
+    "lilly": "LLY", "j&j": "JNJ", "amex": "AXP", "ge aerospace": "GE", "raytheon": "RTX",
+    "john deere": "DE", "southern company": "SO", "air products": "APD", "equity residential": "VMRK",
+    "live nation": "LYV", "johnson & johnson": "JNJ", "digital realty": "DLR", "martin marietta": "MLM",
+    "enterprise products": "EPD",
+}
 # Words dropped from SEC names: "ADVANCED MICRO DEVICES INC" -> "advanced micro devices".
-NAME_SUFFIXES = {"inc", "corp", "corporation", "co", "com", "company", "ltd", "plc", "platforms", "holdings", "group"}
-# First words too common to stand for a company on their own ("advanced packaging" isn't AMD).
-GENERIC_FIRST_WORDS = {"advanced", "american", "general", "united", "first", "international", "national", "bank"}
+NAME_SUFFIXES = {"inc", "corp", "corporation", "co", "com", "company", "ltd", "plc", "platforms", "holdings",
+                 "group", "l", "p"}
+# First words too common to stand for a company on their own ("advanced packaging" isn't AMD,
+# "Lockheed Martin" isn't Martin Marietta, "Sherwin-Williams" isn't the Williams Companies).
+GENERIC_FIRST_WORDS = {
+    "advanced", "american", "general", "united", "first", "international", "national", "bank",
+    "home", "live", "booking", "philip", "morgan", "wells", "union", "parker", "williams", "enterprise",
+    "southern", "simon", "digital", "public", "realty", "martin", "johnson",
+}
+# Tickers that are also ordinary capitalised words or abbreviations ("3 PM", "SO", "DE").
+# These companies are found by name only.
+WORD_TICKERS = {"PM", "SO", "DE", "LOW", "WELL", "COST"}
 
 YEAR = re.compile(r"(?:\bFY\s*'?|\b)(20\d{2})\b|\bFY\s*'?(\d{2})\b", re.IGNORECASE)  # 2024, FY2024, FY24
 YEAR_RANGE = re.compile(r"\b(20\d{2})\s*(?:-|–|to|through|until)\s*(20\d{2})\b", re.IGNORECASE)
@@ -46,11 +66,12 @@ def company_aliases(companies: dict[str, str]) -> dict[str, str]:
     """{ticker: SEC name} -> {lowercase alias: ticker}."""
     aliases = {}
     for ticker, name in companies.items():
+        name = re.sub(r"\s*/.*$", "", name)  # SEC adds the state: "BANK OF AMERICA CORP /DE/"
         words = [w for w in re.sub(r"[^a-z0-9 ]", " ", name.lower()).split() if w not in NAME_SUFFIXES]
-        if words:
+        if len(words) > 1 or (words and words[0] not in GENERIC_FIRST_WORDS):
             aliases[" ".join(words)] = ticker              # "advanced micro devices", "jpmorgan chase"
-            if len(words[0]) >= 4 and words[0] not in GENERIC_FIRST_WORDS:
-                aliases[words[0]] = ticker                 # "apple", "jpmorgan", "amazon"
+        if words and len(words[0]) >= 4 and words[0] not in GENERIC_FIRST_WORDS:
+            aliases[words[0]] = ticker                     # "apple", "jpmorgan", "amazon"
     aliases.update({alias: t for alias, t in NICKNAMES.items() if t in companies})
     return aliases
 
@@ -60,7 +81,7 @@ def detect_companies(question: str, companies: dict[str, str]) -> list[str]:
     for ticker in companies:
         # Case-sensitive, so "AMD" matches but a word like "amd" inside text doesn't.
         # One-letter tickers (Visa is "V") would match ordinary capital letters, so they're skipped.
-        if len(ticker) > 1 and re.search(rf"\b{re.escape(ticker)}\b", question):
+        if len(ticker) > 1 and ticker not in WORD_TICKERS and re.search(rf"\b{re.escape(ticker)}\b", question):
             found.add(ticker)
     lowered = question.lower()
     for alias, ticker in company_aliases(companies).items():

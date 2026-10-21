@@ -17,7 +17,7 @@ FilingLens combines three things:
 | 1 | Data pipeline: SEC filings, financials and stock prices into DuckDB | Done |
 | 2 | Split reports into sections; RAG with citations | Built, being checked |
 | 3 | Text-to-SQL with safety checks, query router, charts | Built, being checked |
-| 4 | Research study: report language vs. stock returns | Planned |
+| 4 | Research study: report language vs. stock returns (99 companies) | Built, being checked |
 | 5 | Evaluation set; hybrid search + reranker | Planned |
 | 6 | Streamlit app, Docker, deployment | Planned |
 
@@ -54,12 +54,13 @@ copy .env.example .env            # macOS/Linux: cp .env.example .env
 # then edit .env: your name and email in SEC_USER_AGENT (SEC requires it),
 # and a free Gemini key in GEMINI_API_KEY (https://aistudio.google.com/apikey)
 
-python -m filinglens.pipeline        # downloads everything, about 5 minutes the first time
+python -m filinglens.pipeline        # downloads everything (99 companies: 30-60 minutes the first time, ~2 GB)
 python -m filinglens.parse_reports   # reports -> sections -> chunks
 python -m filinglens.build_index     # chunks -> vectors in ChromaDB (uses the GPU)
 python -m filinglens.ask "What supply chain risks did Apple describe in 2024?"      # text -> RAG
 python -m filinglens.ask "Compare NVIDIA's and AMD's gross margins since 2021"     # numbers -> SQL + chart
 python -m filinglens.ask "How did Apple's R&D spending change since 2021, and why?" # both
+python -m filinglens.research.build  # Step 4: change scores, tone, returns, topics (uses the GPU)
 pytest                               # runs the tests
 ```
 
@@ -74,6 +75,7 @@ Companies and years are set in [`config/companies.yaml`](config/companies.yaml).
 | 10-K annual reports | SEC EDGAR submissions API | Free |
 | Financial statements | SEC XBRL "companyfacts" API | Free |
 | Daily stock prices (split/dividend adjusted) | Yahoo Finance via `yfinance` | Free |
+| Sector and industry labels | Yahoo Finance via `yfinance` | Free |
 
 ## Database
 
@@ -82,12 +84,17 @@ Everything lives in one DuckDB file, `data/processed/filinglens.duckdb`:
 | Table | One row per | Main columns |
 |---|---|---|
 | `companies` | company | ticker, cik, name |
+| `company_info` | company | sector, industry (Yahoo Finance labels) |
 | `filings` | 10-K report | ticker, fiscal_year, filing_date, document_url, local_path |
 | `financials` | company, year, metric | metric, value, unit, xbrl_tag, accession_number |
 | `prices` | company, trading day | close (adjusted), volume |
 | `financials_wide` (view) | company, year | revenue, net_income, ..., gross_margin, net_margin, revenue_growth |
 | `sections` | 10-K section (Item) | ticker, fiscal_year, item ('1A', '7', ...), title, text, n_words |
 | `chunks` | ~250-word passage | chunk_id, ticker, fiscal_year, item, chunk_index, text |
+| `text_change` | section, company, year | how much Risk Factors / MD&A changed since last year (3 measures) |
+| `tone` | MD&A | FinBERT tone, share of positive and negative sentences |
+| `future_returns` | 10-K report | 3, 6, 12-month return minus the market's, after the filing date |
+| `topic_mentions` | report, topic | mentions of AI, tariffs, supply chain, ... |
 
 The chunks' embeddings live in a ChromaDB vector database in `data/processed/chroma/`.
 
@@ -109,7 +116,7 @@ FilingLens/
 │   ├── router.py              Step 3: numbers, text or both?
 │   ├── combine.py             Step 3: one answer from the SQL table + passages, citing [DB] and [n]
 │   ├── charts.py              Step 3: line chart for trend results (Plotly)
-│   ├── llm.py                 the one place that calls the LLM (Gemini or Ollama)
+│   ├── llm.py                 the one place that calls the LLM (Gemini, Groq or Ollama)
 │   ├── sql/
 │   │   ├── schema.py          what the tables and columns mean, for the LLM
 │   │   ├── text_to_sql.py     question -> SQL, one retry with the error
@@ -123,12 +130,23 @@ FilingLens/
 │   │   ├── vector_store.py    ChromaDB: store and search vectors with filters
 │   │   ├── filters.py         which companies and years a question is about
 │   │   └── answer.py          prompt with numbered sources, citation check
+│   ├── research/              Step 4: the Lazy Prices study
+│   │   ├── pick_companies.py  which companies to add, by a stated rule
+│   │   ├── text_change.py     year-on-year change of a section (word counts, word sets, meaning)
+│   │   ├── tone.py            FinBERT tone of the MD&A
+│   │   ├── returns.py         abnormal returns after each filing, without look-ahead bias
+│   │   ├── topics.py          topic mentions by year
+│   │   ├── analysis.py        correlations, quintiles, regressions, robustness grid
+│   │   ├── plots.py           the charts (matplotlib, saved to docs/images/)
+│   │   └── build.py           computes everything above into DuckDB
 │   └── ingest/
 │       ├── sec_client.py      polite SEC downloader: rate limit, retries, cache
 │       ├── companies.py       ticker -> SEC company ID (CIK)
 │       ├── financials.py      XBRL facts -> tidy yearly financials
 │       ├── filings.py         find 10-K reports
-│       └── prices.py          daily stock prices
+│       ├── prices.py          daily stock prices
+│       └── company_info.py    sector and industry labels
+├── notebooks/                 04_research_study.ipynb: the statistics and charts
 ├── tests/                     offline tests with SEC-shaped sample data
 └── docs/                      step-by-step explanation of each part
 ```
@@ -139,3 +157,4 @@ FilingLens/
 - [Step 1: data pipeline](docs/01_data_pipeline.md), with how it works and why it's built this way
 - [Step 2: reading the reports and RAG](docs/02_rag.md)
 - [Step 3: text-to-SQL, the router and charts](docs/03_text_to_sql.md)
+- [Step 4: research study, findings](docs/04_research_findings.md)

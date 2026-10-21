@@ -63,7 +63,9 @@ To write correct SQL, the LLM needs to know what the columns **mean**, not just 
 
 Most of the description is written by hand, because the database doesn't store meaning. The rest is read from the data each time: the list of companies, the date each company's fiscal year ends ("NVDA: FY2025 ended 2025-01-26"), and the years and dates available. That part stays correct when you add companies in Step 4.
 
-Only five tables are described and allowed: `financials_wide`, `financials`, `companies`, `filings`, `prices`. The report text (`sections`, `chunks`) is left out on purpose: questions about wording go to RAG.
+Only six tables are described and allowed: `financials_wide`, `financials`, `companies`, `company_info`, `filings`, `prices`. The report text (`sections`, `chunks`) and Step 4's research tables are left out on purpose: questions about wording go to RAG.
+
+*Added in Step 4:* `company_info` (sector and industry labels from Yahoo Finance), so questions like _"Which healthcare company had the highest net margin in 2024?"_ can be answered with a join. The schema lists the 11 sector names actually in the data, so the LLM writes `sector = 'Healthcare'` instead of guessing `'Health Care'`. Its `market_cap` is today's value, and the description says so in capitals: using it for a past year would be look-ahead bias. **Cost:** with 99 companies, the per-company lines make the SQL prompt about 1,100 tokens longer (~3,250 instead of ~2,200). One question still fits in Groq's free limit of 8,000 tokens a minute, but several questions in quick succession may have to wait a few seconds (`llm.py` waits out short limits by itself). At thousands of companies, the list would have to be replaced by a lookup (e.g. only the companies named in the question).
 
 ### 3.2 Text-to-SQL (`sql/text_to_sql.py`)
 

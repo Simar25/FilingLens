@@ -4,6 +4,7 @@
   2. Download its financial numbers       -> 'financials' table
   3. Find and download its 10-K reports   -> 'filings' table + files in data/raw/filings/
   4. Download daily stock prices          -> 'prices' table
+     and sector/industry labels           -> 'company_info' table (added in Step 4)
   5. Save everything in DuckDB            -> data/processed/filinglens.duckdb
 
 Re-running is safe: downloads are cached and database rows are replaced, not duplicated.
@@ -20,6 +21,7 @@ import requests
 from filinglens import database
 from filinglens.config import PROJECT_ROOT, RAW_DIR, Settings, load_settings
 from filinglens.ingest.companies import resolve_companies
+from filinglens.ingest.company_info import download_company_info
 from filinglens.ingest.filings import assign_fiscal_years, document_url, list_10k_filings
 from filinglens.ingest.financials import extract_annual_financials, fetch_company_facts
 from filinglens.ingest.prices import download_prices
@@ -32,7 +34,8 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Download SEC filings, financials and prices into DuckDB.")
     parser.add_argument("--tickers", nargs="+", help="Use these tickers instead of config/companies.yaml")
     parser.add_argument("--skip-sec", action="store_true", help="Skip SEC downloads; only update prices")
-    parser.add_argument("--skip-prices", action="store_true", help="Skip stock prices")
+    parser.add_argument("--skip-prices", action="store_true",
+                        help="Skip Yahoo Finance downloads (stock prices and sector labels)")
     parser.add_argument("--skip-documents", action="store_true",
                         help="List 10-K reports but don't download the report files")
     parser.add_argument("--refresh", action="store_true",
@@ -106,6 +109,7 @@ def main(argv: list[str] | None = None) -> None:
             log.info("Downloading daily prices for %d tickers", len(price_tickers))
             prices = download_prices(price_tickers, start=date(settings.start_fiscal_year - 1, 1, 1))
             database.replace_rows(con, "prices", prices)
+            database.replace_rows(con, "company_info", download_company_info(tickers))
 
         database.create_views(con)
         database.print_summary(con)

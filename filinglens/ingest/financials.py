@@ -51,9 +51,13 @@ class Metric:
 
 
 METRICS: dict[str, Metric] = {
+    # Fallbacks come last, so they only fill years where no earlier tag exists (Step 4's
+    # 85 extra companies showed which ones are needed).
     "revenue": Metric(
         ("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax",
-         "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet"),
+         "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet",
+         "RevenuesNetOfInterestExpense",              # banks: total net revenue (Wells Fargo, Goldman)
+         "RegulatedAndUnregulatedOperatingRevenue"),  # utilities (Xcel)
         "USD", "duration"),
     "cost_of_revenue": Metric(("CostOfRevenue", "CostOfGoodsAndServicesSold"), "USD", "duration"),
     "gross_profit": Metric(("GrossProfit",), "USD", "duration"),
@@ -61,7 +65,11 @@ METRICS: dict[str, Metric] = {
         ("ResearchAndDevelopmentExpense", "ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost"),
         "USD", "duration"),
     "operating_income": Metric(("OperatingIncomeLoss",), "USD", "duration"),
-    "net_income": Metric(("NetIncomeLoss",), "USD", "duration"),
+    "net_income": Metric(
+        ("NetIncomeLoss",                                     # attributable to the company's shareholders
+         "NetIncomeLossAvailableToCommonStockholdersBasic",   # same, after preferred dividends (Caterpillar)
+         "ProfitLoss"),                                       # incl. minority interests' share (Broadcom)
+        "USD", "duration"),
     "eps_diluted": Metric(("EarningsPerShareDiluted",), "USD/shares", "duration"),
     "operating_cash_flow": Metric(("NetCashProvidedByUsedInOperatingActivities",), "USD", "duration"),
     "capex": Metric(

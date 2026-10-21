@@ -43,6 +43,30 @@ def test_generic_words_are_not_companies():
     assert (f.tickers, f.years) == ([], [])
 
 
+# Step 4 companies whose names start with everyday words, or share them.
+MORE_COMPANIES = {
+    "HD": "HOME DEPOT, INC.", "LMT": "LOCKHEED MARTIN CORP", "MLM": "MARTIN MARIETTA MATERIALS INC",
+    "SHW": "SHERWIN WILLIAMS CO", "WMB": "WILLIAMS COMPANIES, INC.", "BAC": "BANK OF AMERICA CORP /DE/",
+    "SO": "SOUTHERN CO", "SCCO": "SOUTHERN COPPER CORP/", "PM": "Philip Morris International Inc.",
+    "MS": "MORGAN STANLEY", "JPM": "JPMORGAN CHASE & CO", "JNJ": "JOHNSON & JOHNSON",
+}
+
+
+@pytest.mark.parametrize("question, tickers", [
+    ("Work from home risks in 2021", []),
+    ("Home Depot and the housing market", ["HD"]),
+    ("Lockheed Martin backlog", ["LMT"]),
+    ("Sherwin-Williams paint demand", ["SHW"]),
+    ("How does Bank of America describe credit risk?", ["BAC"]),  # SEC's name ends in "/DE/"
+    ("J.P. Morgan vs Morgan Stanley", ["JPM", "MS"]),
+    ("Southern Company and Southern Copper", ["SCCO", "SO"]),
+    ("Revenue reported at 3 PM", []),
+    ("Johnson & Johnson talc litigation", ["JNJ"]),
+])
+def test_everyday_words_in_company_names(question, tickers):
+    assert detect_filters(question, MORE_COMPANIES, YEARS).tickers == tickers
+
+
 # ---------- vector store ----------
 
 def test_where_clause():

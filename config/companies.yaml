@@ -1,5 +1,5 @@
 # Which companies and years the pipeline downloads.
-# Start small (quick to run and debug), then add more tickers later.
+# Steps 1-3 started with the first 14 (quick to run and debug); Step 4 added 85 more.
 
 tickers:
   - AAPL   # Apple       - fiscal year ends late September
@@ -16,6 +16,108 @@ tickers:
   - NFLX
   - TSLA
   - JPM
+
+  # --- Step 4: 85 more companies, so the research study has enough data points. ---
+  # Picked by  python -m filinglens.research.pick_companies  on 2026-10-20: the largest
+  # US-listed companies (by market value) in each of Yahoo Finance's 11 sectors that file a
+  # 10-K for every year below, filling each sector up to 9 companies including the ones above.
+  # Technology
+  - AVGO   # Broadcom
+  # Communication Services
+  - DIS    # Walt Disney
+  - VZ     # Verizon
+  - TMUS   # T-Mobile US
+  - T      # AT&T
+  - CMCSA  # Comcast
+  - LYV    # Live Nation Entertainment
+  # Consumer Cyclical
+  - HD     # Home Depot
+  - MCD    # McDonald's
+  - TJX    # TJX Companies
+  - BKNG   # Booking Holdings
+  - SBUX   # Starbucks
+  - LOW    # Lowe's
+  - ABNB   # Airbnb
+  # Consumer Defensive
+  - WMT    # Walmart     - fiscal year ends January 31
+  - COST   # Costco      - fiscal year ends around September 1
+  - KO     # Coca-Cola
+  - PG     # Procter & Gamble - fiscal year ends June 30
+  - PM     # Philip Morris International
+  - PEP    # PepsiCo
+  - MO     # Altria
+  - MNST   # Monster Beverage
+  - MDLZ   # Mondelez
+  # Healthcare
+  - LLY    # Eli Lilly
+  - JNJ    # Johnson & Johnson
+  - ABBV   # AbbVie
+  - UNH    # UnitedHealth
+  - MRK    # Merck
+  - TMO    # Thermo Fisher Scientific
+  - AMGN   # Amgen
+  - GILD   # Gilead Sciences
+  - ABT    # Abbott Laboratories
+  # Financial Services
+  - BRK-B  # Berkshire Hathaway (class B shares)
+  - V      # Visa        - fiscal year ends September 30
+  - MA     # Mastercard
+  - BAC    # Bank of America
+  - MS     # Morgan Stanley
+  - GS     # Goldman Sachs
+  - WFC    # Wells Fargo
+  - AXP    # American Express
+  # Industrials
+  - CAT    # Caterpillar
+  - GE     # GE Aerospace
+  - RTX    # RTX (Raytheon)
+  - DE     # Deere       - fiscal year ends around October 31
+  - UNP    # Union Pacific
+  - BA     # Boeing
+  - ETN    # Eaton
+  - LMT    # Lockheed Martin
+  - PH     # Parker-Hannifin - fiscal year ends June 30
+  # Energy
+  - CVX    # Chevron
+  - COP    # ConocoPhillips
+  - MPC    # Marathon Petroleum
+  - VLO    # Valero Energy
+  - PSX    # Phillips 66
+  - ENB    # Enbridge (Canadian, but files 10-Ks)
+  - WMB    # Williams Companies
+  - EOG    # EOG Resources
+  - EPD    # Enterprise Products Partners (a partnership: "units", not shares)
+  # Utilities
+  - NEE    # NextEra Energy
+  - SO     # Southern Company
+  - DUK    # Duke Energy
+  - AEP    # American Electric Power
+  - D      # Dominion Energy
+  - SRE    # Sempra
+  - ETR    # Entergy
+  - VST    # Vistra
+  - XEL    # Xcel Energy
+  # Real Estate
+  - WELL   # Welltower
+  - PLD    # Prologis
+  - EQIX   # Equinix
+  - AMT    # American Tower
+  - SPG    # Simon Property Group
+  - DLR    # Digital Realty Trust
+  - PSA    # Public Storage
+  - O      # Realty Income
+  - VMRK   # Vivmark Residential, formerly Equity Residential (SEC CIK 906107; Yahoo labels it
+           #   "AvalonBay Communities", but its price history is the Equity Residential one)
+  # Basic Materials
+  - LIN    # Linde
+  - SCCO   # Southern Copper
+  - NEM    # Newmont
+  - FCX    # Freeport-McMoRan
+  - SHW    # Sherwin-Williams
+  - ECL    # Ecolab
+  - APD    # Air Products and Chemicals
+  - NUE    # Nucor
+  - MLM    # Martin Marietta Materials
 
 # Fiscal years to keep (inclusive).
 start_fiscal_year: 2020

@@ -8,7 +8,9 @@ each Item starts is harder than it sounds:
     -> For each Item, we keep the heading followed by the LONGEST stretch of text.
   - Some companies repeat a bare "Item 1" at the top of every page.
     -> A real heading must carry the Item's title ("Risk Factors"...) on the
-       same line or the line right after it.
+       same line or the line right after it. The heading line may hold other
+       words too: Bank of America writes "Item 7. Bank of America Corporation
+       and Subsidiaries", with "Management's Discussion and Analysis" below it.
   - Banks such as JPMorgan put a short "see pages 52-167" under Item 7 and
     attach the full annual report after the last Item.
     -> A very long final section is labelled "Attached annual report".
@@ -96,7 +98,7 @@ def find_headings(text: str) -> list[tuple[int, str]]:
         if item not in ITEMS:
             continue
         same_line, next_line = match.group(2), lines[i + 1] if i + 1 < len(lines) else ""
-        if _is_real_title(item, same_line) or (not same_line.strip() and _is_real_title(item, next_line)):
+        if _is_real_title(item, same_line) or _is_real_title(item, next_line):
             headings.append((starts[i], item))
     return headings
 

@@ -21,6 +21,9 @@ def db_path(tmp_path):
     con = database.connect(path)
     database.replace_rows(con, "companies", pd.DataFrame(
         {"ticker": ["NVDA", "AMD"], "cik": [1045810, 2488], "name": ["NVIDIA CORP", "ADVANCED MICRO DEVICES INC"]}))
+    database.replace_rows(con, "company_info", pd.DataFrame(
+        {"ticker": ["NVDA", "AMD"], "sector": "Technology", "industry": "Semiconductors",
+         "as_of": pd.Timestamp("2026-10-21")}))
     rows = []
     for ticker, revenues in {"NVDA": [10.0, 16.0, 27.0], "AMD": [9.0, 16.0, 23.0]}.items():
         for year, revenue in zip([2021, 2022, 2023], revenues):
@@ -72,6 +75,7 @@ def scripted_llm(*answers: str):
     "SELECT * FROM financials f JOIN companies c USING (ticker) ORDER BY 1 LIMIT 5",
     "SELECT ticker FROM prices UNION ALL SELECT ticker FROM companies",
     "SELECT * FROM main.prices;",
+    "SELECT ticker, net_margin FROM financials_wide JOIN company_info USING (ticker) WHERE sector = 'Technology'",
 ])
 def test_ordinary_queries_pass(sql):
     assert check_sql(sql)
@@ -89,6 +93,7 @@ def test_ordinary_queries_pass(sql):
     ("SELECT * FROM range(1000000000)", "Table functions"),
     ("SELECT * FROM (SELECT * FROM read_csv('x.csv'))", "Table functions"),
     ("SELECT * FROM chunks", "not allowed"),                            # report text is RAG's job
+    ("SELECT * FROM text_change", "not allowed"),                       # Step 4's research tables too
     ("SELECT * FROM other.main.prices", "Only tables in this database"),
     ("SELECT read_blob('x')", "not allowed"),
     ("SELECT * FROM prices WHERE ticker = (", "could not be parsed"),
@@ -131,6 +136,7 @@ def test_schema_lists_companies_fiscal_year_ends_and_metrics(con):
     assert "NVDA: NVIDIA CORP (FY2023 ended 2023-01-29)" in schema
     assert "metric is one of: cost_of_revenue, revenue" in schema
     assert "fiscal years 2021 to 2023" in schema
+    assert "sector is one of: 'Technology'" in schema  # real values, so the LLM doesn't guess 'Tech'
 
 
 # ---------- 3.2 text-to-SQL ----------
