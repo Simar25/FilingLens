@@ -24,12 +24,18 @@ from filinglens.config import DB_PATH
 from filinglens.llm import LLMReply
 from filinglens.rag.answer import answer_question, find_citations
 from filinglens.rag.filters import Filters, detect_filters
+from filinglens.rag.keyword_search import INDEX_PATH, KeywordIndex, reciprocal_rank_fusion
 from filinglens.rag.vector_store import SearchResult
 from filinglens.router import ROUTES, RouteDecision, route_question
 from filinglens.sql.safety import connect_readonly
 from filinglens.sql.schema import describe_schema
 from filinglens.sql.text_to_sql import SqlResult, has_data, text_to_sql
 
+# Step 5: vector = embeddings only (Step 2); keyword = BM25 only; hybrid = both, merged;
+# rerank = hybrid, then the best CANDIDATES re-scored by a cross-encoder.
+SEARCH_MODES = ("vector", "keyword", "hybrid", "rerank")
+DEFAULT_SEARCH = "hybrid"  # best Recall@5 on the Step 5 test set (docs/05_evaluation.md)
+CANDIDATES = 20  # results each search passes on to the merge and the reranker
 NO_DATA_ANSWER = "The query ran, but the database has no rows matching this question."
 
 
@@ -64,6 +70,8 @@ class Assistant:
         self.schema = describe_schema(self.con)
         self._embedder = None
         self._store = None
+        self._keywords = None
+        self._reranker = None
 
     def close(self) -> None:
         self.con.close()
@@ -87,23 +95,47 @@ class Assistant:
             filters.items = [i.upper() for i in items]
         return filters
 
-    def search(self, question: str, filters: Filters, k: int = 8) -> list[SearchResult]:
+    def search(self, question: str, filters: Filters, k: int = 8, mode: str = DEFAULT_SEARCH) -> list[SearchResult]:
+        """The k best report passages. `mode` is one of SEARCH_MODES (compared in docs/05_evaluation.md)."""
+        if mode not in SEARCH_MODES:
+            raise ValueError(f"mode must be one of {SEARCH_MODES}, not {mode!r}")
+        self._load_search(mode)
+        if mode == "keyword":
+            return self._store.get(self._keywords.search(question, filters, k))
+        vector = self._store.search(self._embedder.embed_query(question), k=k if mode == "vector" else CANDIDATES,
+                                    filters=filters)
+        if mode == "vector":
+            return vector
+        fused = reciprocal_rank_fusion(vector, self._store.get(self._keywords.search(question, filters, CANDIDATES)))
+        return fused[:k] if mode == "hybrid" else self._reranker.rerank(question, fused[:CANDIDATES], k)
+
+    def _load_search(self, mode: str) -> None:
+        """Load only what this search needs, once. Imported here: loading PyTorch takes seconds,
+        and number questions don't need it."""
         if self._store is None:
-            # Imported here: loading PyTorch takes seconds, and number questions don't need it.
-            from filinglens.rag.embeddings import Embedder
             from filinglens.rag.vector_store import VectorStore
 
             self._store = VectorStore()
             if self._store.count() == 0:
                 raise SetupError("The vector database is empty. Run  python -m filinglens.build_index  first.")
+        if mode != "keyword" and self._embedder is None:
+            from filinglens.rag.embeddings import Embedder
+
             self._embedder = Embedder()
-        return self._store.search(self._embedder.embed_query(question), k=k, filters=filters)
+        if mode != "vector" and self._keywords is None:
+            if not INDEX_PATH.exists():
+                raise SetupError("The keyword index is missing. Run  python -m filinglens.build_index --keywords-only")
+            self._keywords = KeywordIndex.load()
+        if mode == "rerank" and self._reranker is None:
+            from filinglens.rag.rerank import Reranker
+
+            self._reranker = Reranker()
 
     # ---------- the whole flow ----------
 
     def ask(self, question: str, route: str | None = None, tickers=None, years=None, items=None,
-            k: int = 8) -> Response:
-        """Answer a question. `route` ("numbers", "text" or "both") skips the router."""
+            k: int = 8, search: str = DEFAULT_SEARCH) -> Response:
+        """Answer a question. `route` ("numbers", "text" or "both") skips the router; `search` is a SEARCH_MODE."""
         if route:
             if route not in ROUTES:
                 raise ValueError(f"route must be one of {ROUTES}, not {route!r}")
@@ -118,7 +150,7 @@ class Assistant:
         if decision.route in ("text", "both"):
             response.filters = self.filters_for(question, tickers, years, items)
             start = time.perf_counter()
-            response.sources = self.search(question, response.filters, k)
+            response.sources = self.search(question, response.filters, k, search)
             response.search_seconds = time.perf_counter() - start
 
         if decision.route == "text":

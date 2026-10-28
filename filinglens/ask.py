@@ -16,6 +16,7 @@ Options:
     --year 2023 2024      only search these fiscal years' reports (default: detected from the question)
     --section 1A 7        only search these Items, e.g. 1A = Risk Factors, 7 = MD&A
     -k 8                  how many report passages to give the LLM
+    --search vector       how to search the reports: vector, keyword, hybrid (default) or rerank (Step 5)
     --search-only         show the report passages the search finds, without asking the LLM
     --show-text           print the full text of every source
     --no-chart            don't save or open a chart
@@ -32,7 +33,7 @@ from datetime import datetime
 import pandas as pd
 
 from filinglens import llm
-from filinglens.assistant import Assistant, Response, SetupError
+from filinglens.assistant import DEFAULT_SEARCH, SEARCH_MODES, Assistant, Response, SetupError
 from filinglens.charts import save_chart
 from filinglens.combine import DB_CITATION
 from filinglens.config import PROJECT_ROOT
@@ -53,6 +54,8 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--year", nargs="+", type=int, help="Only these fiscal years' reports")
     parser.add_argument("--section", nargs="+", help="Only these Items, e.g. 1A 7")
     parser.add_argument("-k", type=int, default=8, help="Number of report passages to retrieve (default 8)")
+    parser.add_argument("--search", choices=SEARCH_MODES, default=DEFAULT_SEARCH,
+                        help=f"How to search the reports (default {DEFAULT_SEARCH})")
     parser.add_argument("--search-only", action="store_true", help="Show the search results; don't call the LLM")
     parser.add_argument("--show-text", action="store_true", help="Print the full text of each source")
     parser.add_argument("--no-chart", action="store_true", help="Don't save or open a chart")
@@ -62,7 +65,7 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 
 def print_source(number: int, source: SearchResult, full_text: bool) -> None:
-    print(f"  [{number}] {source.label}  (similarity {source.similarity:.2f}, id {source.chunk_id})")
+    print(f"  [{number}] {source.label}  (score {source.score:.2f}, id {source.chunk_id})")
     if full_text:
         body = source.text
     else:
@@ -123,9 +126,9 @@ def show_chart(response: Response) -> None:
 
 def search_only(assistant: Assistant, args: argparse.Namespace) -> None:
     filters = assistant.filters_for(args.question, args.ticker, args.year, args.section)
-    print(f"Searching: {filters.describe()}")
+    print(f"Searching ({args.search}): {filters.describe()}")
     start = time.perf_counter()
-    sources = assistant.search(args.question, filters, args.k)
+    sources = assistant.search(args.question, filters, args.k, args.search)
     print(f"Found {len(sources)} passages in {time.perf_counter() - start:.1f} s")
     for number, source in enumerate(sources, start=1):
         print_source(number, source, args.show_text)
@@ -141,7 +144,7 @@ def main(argv: list[str] | None = None) -> None:
                 return
             start = time.perf_counter()
             response = assistant.ask(args.question, route=args.route, tickers=args.ticker, years=args.year,
-                                     items=args.section, k=args.k)
+                                     items=args.section, k=args.k, search=args.search)
         except (llm.LLMError, SetupError) as exc:
             sys.exit(f"\n{exc}")
 

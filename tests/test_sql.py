@@ -294,7 +294,7 @@ def test_both_route_combines_sql_and_passages(db_path):
         "Revenue reached 27e9 [DB], driven by data center demand [1].",
     )
     with Assistant(db_path, generate=llm) as assistant:
-        assistant.search = lambda question, filters, k: [passage]  # no embedding model or vector DB in tests
+        assistant.search = lambda question, filters, k, mode: [passage]  # no embedding model or vector DB in tests
         response = assistant.ask("How did NVIDIA's revenue change, and why?", route="both")
     assert response.filters.tickers == ["NVDA"]
     assert (response.cites_db, response.cited, response.invalid_citations) == (True, [1], [])

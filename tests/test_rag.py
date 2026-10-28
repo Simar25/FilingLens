@@ -6,7 +6,10 @@ from filinglens import llm
 from filinglens.llm import LLMReply
 from filinglens.rag.answer import NO_SOURCES_ANSWER, answer_question, build_prompt, find_citations
 from filinglens.rag.embeddings import passage_text
+from filinglens.evaluation.draft_questions import parse_draft
+from filinglens.evaluation.search_eval import first_rank, summarize
 from filinglens.rag.filters import Filters, detect_filters
+from filinglens.rag.keyword_search import KeywordIndex, reciprocal_rank_fusion
 from filinglens.rag.vector_store import SearchResult, VectorStore, build_where
 
 COMPANIES = {
@@ -93,8 +96,8 @@ def test_search_respects_filters_and_ranks_by_similarity(tmp_path):
     query = np.array([1, 0, 0], dtype=np.float32)
     everything = store.search(query, k=3)
     assert [r.chunk_id for r in everything] == ["AAPL-2024-1A-0000", "AAPL-2023-1A-0000", "MSFT-2024-7-0000"]
-    assert everything[0].similarity == pytest.approx(1.0)
-    assert everything[1].similarity == pytest.approx(0.8)
+    assert everything[0].score == pytest.approx(1.0)
+    assert everything[1].score == pytest.approx(0.8)
 
     only_2023 = store.search(query, k=3, filters=Filters(tickers=["AAPL"], years=[2023]))
     assert [(r.ticker, r.fiscal_year, r.text) for r in only_2023] == [("AAPL", 2023, "text AAPL 2023")]
@@ -302,3 +305,55 @@ def test_model_quirks_are_cleaned():
     raw = ("fiscal\u202f2024, **$108.81\u202fbillion**\u3010DB\u3011 because of year\u2011over\u2011year "
            "demand\u30102\u2020L1-L3\u3011.")
     assert llm.clean_text(raw) == "fiscal 2024, **$108.81 billion**[DB] because of year-over-year demand[2]."
+
+
+# ---------- Step 5: keyword search, hybrid merge, evaluation ----------
+
+def keyword_index() -> KeywordIndex:
+    chunks = pd.DataFrame({"chunk_id": ["a", "b", "c", "d"], "ticker": ["AAPL", "AAPL", "AAPL", "MSFT"],
+                           "fiscal_year": [2024, 2024, 2023, 2024], "item": ["7", "7", "7", "7"]})
+    texts = ["R&D expense grew because of headcount.",
+             "Revenue grew in every segment.",
+             "R&D expense and revenue grew in 2023.",
+             "Revenue grew because of headcount."]
+    return KeywordIndex.build(chunks, texts)
+
+
+def test_bm25_favours_rare_words_and_respects_filters():
+    index = keyword_index()
+    # "r&d" is one word, in 2 of the 4 passages; "revenue" is in 3, so it counts less.
+    assert [chunk_id for chunk_id, _ in index.search("R&D and revenue", Filters(), 4)][:2] == ["c", "a"]
+    assert [c for c, _ in index.search("R&D", Filters(tickers=["AAPL"], years=[2024]), 4)] == ["a"]
+    assert index.search("the and of", Filters(), 4) == []  # only common words: nothing to match
+
+
+def test_keyword_index_survives_save_and_load(tmp_path):
+    index = keyword_index()
+    index.save(tmp_path / "index.pkl")
+    loaded = KeywordIndex.load(tmp_path / "index.pkl")
+    assert loaded.search("headcount", Filters(), 4) == index.search("headcount", Filters(), 4)
+
+
+def test_rrf_puts_results_both_searches_found_first():
+    vector = [source(1), source(2), source(3)]
+    keyword = [source(4), source(3)]
+    fused = reciprocal_rank_fusion(vector, keyword)
+    # 3 is 3rd and 2nd: 1/63 + 1/62 beats 1's 1/61 alone. 4 and 1 tie on 1/61: the first list's order wins.
+    assert [r.text for r in fused] == ["passage 3", "passage 1", "passage 4", "passage 2"]
+    assert fused[0].score == pytest.approx(1 / 63 + 1 / 62)
+
+
+def test_ranks_recall_and_mrr():
+    results = [source(1), source(2), source(3)]
+    assert first_rank(results, [source(2).chunk_id, source(3).chunk_id]) == 2
+    assert first_rank(results, ["missing"]) is None
+    metrics = summarize(pd.Series([1, 2, 6, None], dtype=float))
+    assert metrics["Recall@5"] == pytest.approx(0.5)
+    assert metrics["MRR"] == pytest.approx((1 + 1 / 2 + 1 / 6 + 0) / 4)
+
+
+def test_parse_draft_reads_json_and_skips():
+    assert parse_draft('Here: {"question": "Why?", "answer": "Because {x}."}') == {"question": "Why?",
+                                                                                 "answer": "Because {x}."}
+    assert parse_draft("SKIP") is None
+    assert parse_draft('{"question": "Why?"}') is None

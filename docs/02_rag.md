@@ -159,7 +159,8 @@ The first line of output shows the filters used. Check it every time: a wrong fi
 
 Knowing the failure modes is what interviewers are really asking about.
 
-1. **The right passage isn't retrieved.** Vector search matches meaning, not exact terms. Questions about specific names ("Item 1C", "H20 chips", "Basel III") can miss. Step 5 adds keyword search (BM25) and a reranker for this.
+1. **The right passage isn't retrieved.** Vector search matches meaning, not exact terms. Questions about specific names ("Item 1C", "H20 chips", "Basel III") can miss. Step 5 adds keyword search (BM25) for this: hybrid search raised Recall@5 from 0.86 to 0.94 on 50 test questions, and ranked the right passage higher on 22 of them (docs/05_evaluation.md).
+   *Real example (2026-10-22):* "How did Apple's R&D spending change since 2021, and why?" got a reason for every year except 2022, where the answer said the sources gave none. Apple's FY2022 report does explain it (`AAPL-2022-7-0006`: "driven primarily by increases in headcount-related expenses and engineering program costs"). FY2022 did get two of the 8 passages, but both were general MD&A overview text that outranked the R&D paragraph. The good news is that the LLM said it had no source for 2022 instead of making a reason up. This question is a good test case for Step 5. *(It became test question `h01` in Step 5: vector and hybrid search rank this passage 3rd, keyword search misses it, because the passage says "expense" and "growth" where the question says "spending" and "increase". See docs/05_evaluation.md.)*
 2. **Comparison questions are unbalanced.** "Compare Apple's and Microsoft's AI risks" retrieves the 8 closest chunks overall, which may be 7 from one company. Exercise 4.
 3. **Numbers.** The LLM can read a figure from a table in a chunk, but "how much did revenue grow?" is better answered from the `financials` table than from text. Step 3 adds text-to-SQL for this.
 4. **Citations that don't support the claim.** The check only proves `[3]` exists, not that source 3 says what the sentence claims. Step 5 measures *faithfulness* with an LLM grader.
@@ -233,7 +234,7 @@ print(text[-600:])
 ## Exercises (to learn the code)
 
 1. **Check the section split.** Pick 3 reports. For each, print the first and last 600 characters of Item 1A and Item 7 (code above). Does each section start at its heading and end just before the next Item?
-2. **Search without the LLM.** Run one of your questions with `--search-only`. Are the top 3 passages really about the question? Look at the similarity numbers: what's typical for a good match vs. a poor one?
+2. **Search without the LLM.** Run one of your questions with `--search-only`. Are the top 3 passages really about the question? Look at the scores: what's typical for a good match vs. a poor one? (Since Step 5 the default search is hybrid, whose scores are rank-fusion scores, about 0.015 to 0.033, not similarities. Add `--search vector` to see vector search's similarities instead.)
 3. **Change the chunk size.** Set `MAX_WORDS = 150` in `text/chunking.py`, re-run `parse_reports` and `build_index`, and repeat exercise 2 for 3 questions. Better or worse? Set it back to 300 afterwards (and re-run both commands).
 4. **Fix an unbalanced comparison.** Ask `--search-only "Compare how Apple and Microsoft describe AI risks in 2025"` and count the passages per company. How would you change `ask.py` so each company gets its fair share? (Hint: one search per ticker.)
 5. **Try to make it hallucinate.** Ask about something the reports don't cover, e.g. *"What did NVIDIA say about its 2030 product roadmap?"* Does it admit it doesn't know? Then remove the "If the sources don't contain the answer..." line from `SYSTEM_PROMPT` and ask again.

@@ -38,7 +38,9 @@ class SearchResult:
     item: str
     title: str
     text: str
-    similarity: float  # cosine similarity: 1 = same direction, 0 = unrelated
+    # Higher = better match. What it measures depends on the search that found it: cosine similarity
+    # (vector, 0 to 1), BM25 (keyword), fused rank (hybrid) or the reranker's score.
+    score: float
 
     @property
     def section(self) -> str:
@@ -100,15 +102,25 @@ class VectorStore:
             include=["documents", "metadatas", "distances"],
         )
         return [
-            SearchResult(
-                chunk_id=chunk_id, ticker=meta["ticker"], company=meta["company"],
-                fiscal_year=meta["fiscal_year"], item=meta["item"], title=meta["title"],
-                text=text, similarity=1 - distance,  # Chroma returns cosine distance = 1 - similarity
-            )
+            _result(chunk_id, meta, text, 1 - distance)  # Chroma returns cosine distance = 1 - similarity
             for chunk_id, meta, text, distance in zip(
                 result["ids"][0], result["metadatas"][0], result["documents"][0], result["distances"][0]
             )
         ]
+
+    def get(self, scored_ids: list[tuple[str, float]]) -> list[SearchResult]:
+        """(chunk_id, score) pairs, e.g. from the keyword search -> SearchResults, in the same order."""
+        if not scored_ids:
+            return []
+        found = self.collection.get(ids=[chunk_id for chunk_id, _ in scored_ids], include=["documents", "metadatas"])
+        rows = {chunk_id: (meta, text) for chunk_id, meta, text in zip(found["ids"], found["metadatas"],
+                                                                       found["documents"])}
+        return [_result(chunk_id, *rows[chunk_id], score) for chunk_id, score in scored_ids if chunk_id in rows]
+
+
+def _result(chunk_id: str, meta: dict, text: str, score: float) -> SearchResult:
+    return SearchResult(chunk_id=chunk_id, ticker=meta["ticker"], company=meta["company"],
+                        fiscal_year=meta["fiscal_year"], item=meta["item"], title=meta["title"], text=text, score=score)
 
 
 def _plain(value):

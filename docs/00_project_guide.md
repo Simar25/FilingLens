@@ -257,7 +257,7 @@ Example of the table you'll produce (your real numbers will differ):
 ## Final: resume, demo and interview prep
 
 - [ ] **Resume bullets.** Use this pattern, with your real numbers from Step 5:
-  > - Built **FilingLens**, an LLM analyst over 250+ SEC 10-K filings that routes each question to hybrid-search RAG (BM25 + embeddings + reranker) or text-to-SQL over DuckDB. Raised Recall@5 from **X% to Y%** on a 100-question test set I built.
+  > - Built **FilingLens**, an LLM analyst over 250+ SEC 10-K filings that routes each question to hybrid-search RAG (BM25 + embeddings, merged by rank fusion) or text-to-SQL over DuckDB. Raised Recall@5 from **X% to Y%** on a **N**-question test set I built (Step 5 part 1: 86% → 94% on 50 search questions).
   > - Tested whether changes in 10-K wording predict stock returns across **N** companies and 6 years (FinBERT sentiment, embedding similarity, regression): **your result**.
   > - Deployed with FastAPI, Streamlit and Docker on Hugging Face Spaces, with cited answers and automated tests (**live link**).
 - [ ] **2-minute demo video** (screen recording): problem, live demo, results table, one thing you learned
