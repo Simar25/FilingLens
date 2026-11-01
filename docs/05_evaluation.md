@@ -1,4 +1,8 @@
-# Step 5 (part 1): measuring the search, then improving it
+# Step 5: measuring the search and the answers
+
+Part 1 measures the search and improves it. [Part 2](#part-2-measuring-the-answers), at the end, measures the answers.
+
+## Part 1: the search
 
 **The question:** when someone asks about a company's annual report, does the search find the passage that answers it? Until now the honest answer was "it seems to". This step replaces that with a number, then uses the number to choose between four ways of searching.
 
@@ -12,7 +16,7 @@
 | 5.4 | Reranker                | A cross-encoder that re-scores the 20 best results                                                                      |
 | 5.6 | Results table           | Below, and in the README                                                                                                |
 
-Part 2 (still to do) measures the _answers_: 40 number questions checked against the database, faithfulness, router accuracy, cost per question.
+Part 2 measures the _answers_: 40 number questions checked against the database, faithfulness, router accuracy, cost per question.
 
 ---
 
@@ -128,8 +132,7 @@ After these fixes vector search scored 0.82, not 0.73. The second review found t
 
 ## What next
 
-1. **Step 5 part 2: answer quality.** 40 number questions with values checked against the database, router accuracy on labelled questions, faithfulness (does each cited source support its sentence?) with an LLM grader, and cost per question.
-2. **Later:** a stronger reranker; stemming; 20 hand-written questions in the way people really ask.
+**Later:** a stronger reranker; stemming; 20 hand-written questions in the way people really ask.
 
 **Rerun everything:**
 
@@ -154,4 +157,85 @@ python -m filinglens.ask --search-only --search vector "In Berkshire Hathaway's 
 - **How did you build the test set, and what are its weaknesses?** An LLM drafted questions from random passages; every one was checked against its passage twice; 16 were edited and 1 dropped; one hard question came from a real failure. Weaknesses: the LLM's questions share the passages' words, 50 is small, some correct passages are unlabelled, and no finance expert reviewed them.
 - **What surprised you?** Seven "failures" were the search finding a different correct passage. The labels were wrong, not the search. I now check the label before blaming the model.
 - **Why didn't you use the reranker, when rerankers are standard?** On this test set it didn't beat hybrid (1 question better, 1 worse) and cost 100 ms more. It even pushed the Apple R&D answer from 3rd to 10th, preferring passages _about_ R&D over the one _explaining_ the change. I'd retest it with a bigger model and more questions rather than add it because it's standard.
-- **What are the risks of using an LLM to write or grade the test?** It shares blind spots with the system it tests (here: wording that favours keyword search), it can be confidently wrong (it named the wrong company once), and it needs checking by hand. Part 2 uses an LLM grader and has to measure that grader against hand labels first.
+- **What are the risks of using an LLM to write or grade the test?** It shares blind spots with the system it tests (here: wording that favours keyword search), it can be confidently wrong (it named the wrong company once), and it needs checking by hand. Part 2's grader scored 25 of 25 on its test and still let a real mistake through, because grading a whole answer at once made it lenient.
+
+---
+
+# Part 2: measuring the answers
+
+**The question:** a good search doesn't prove the answers are right. Are the numbers correct, does the router pick the right path, do the sources say what the answers claim, and what does a question cost?
+
+| What was measured | Result | On what |
+| --- | --- | --- |
+| Number answers with every expected value | **38 of 40** | Values from the database, not from an LLM |
+| SQL result tables with every expected value | 39 of 40 | The same questions |
+| Mixed answers with the right figure | **20 of 20** | "What happened, and why?" questions |
+| Router chose the right path | **85 of 86** | 110 labelled questions planned; the last ones wait on the free tier |
+| Cited sentences a second AI model confirmed | **96 of 105 (91%)** | 39 text and mixed answers, one sentence at a time |
+| The same, text answers only | 25 of 25 | |
+| The same, mixed answers only | 71 of 80 (89%) | |
+| Cost per question at list price | **$0.0013** | $1.27 per 1,000: Groq, gpt-oss-120b, $0.15 in and $0.60 out per million tokens |
+
+| Route | LLM calls | Tokens | Cost | Median time |
+| --- | --- | --- | --- | --- |
+| Numbers | 3 | 5,800 | $0.0011 | 5 s |
+| Text | 2 | 4,100 | $0.0008 | 3 s |
+| Both | 3 | 9,900 | $0.0020 | 20 s |
+
+All of this was measured on the full system: hybrid search, on gpt-oss-120b. The online version uses keyword search and Gemini 3.5 Flash Lite, and hasn't been measured separately.
+
+## How it was measured
+
+**Number questions (`eval/answer_questions.jsonl`).** 40 hand-written questions across lookups, ratios, comparisons, multi-year calculations, calendar-year traps, rankings and stock prices, plus 20 mixed ones. Each has its own SQL, so the expected value comes from the database. Writing them caught three bad questions at once: two asked for figures the database doesn't hold (Amazon's R&D, Caterpillar's liabilities).
+
+**Is the database itself right?** A test against the database can't catch a wrong database. So 26 reported figures were searched for in the 10-K text: 25 appear word for word. The last is Netflix's free cash flow, which is calculated, not printed in that form.
+
+**Scoring a number.** A value counts if the answer shows it rounded to as many decimals as it displays: "$212 billion" passes for 211.915, and "$211.92 million" fails. A number must also be within 1%, so a list number "1" can't stand for 1.2. The same check on the SQL's table shows which step failed: a bad query, or a good query reported wrongly. Scores are computed when results are read, so a fix to the scoring costs no LLM tokens. That paid off three times, because my scoring had bugs too (see below).
+
+**Faithfulness.** The answers came from Groq, and a different model (Gemini 3.5 Flash Lite) graded them, so no model marks its own work. Each cited sentence is shown with only the sources it cites, and the grader says whether every fact in it is supported.
+
+**Testing the grader first.** `eval/grader_check.jsonl` has 25 sentences with a known verdict: 12 checked as correct, 11 made wrong on purpose (a changed figure, a reversed direction, the wrong passage, an added claim) and 2 real mistakes by the app. It scored 25 of 25.
+
+## What the failures showed
+
+| Question | What happened | Why it matters |
+| --- | --- | --- |
+| Eli Lilly's total net income, 2021 to 2023 | Both SQL attempts failed, and the app said so | A visible failure beats a wrong number |
+| The three biggest R&D spenders in tech | The table was right ($16.05bn); the answer rounded it to $16.1bn | The LLM was told to copy figures exactly. Rules in a prompt aren't guarantees |
+| Goldman's Global Markets revenue | Sent to the database, which correctly said it doesn't hold segments, and the app stopped | The reports had the answer. A wrong route can dead-end: on "can't answer" it should fall back to the reports |
+| Merck's 2023 net income | Right figure, wrong reason: it blamed the Organon spin-off, a 2021 event | **A right number doesn't mean a right explanation** |
+
+Three number answers also did arithmetic against the rule (Coca-Cola's lead over PepsiCo, for one). All three were correct, but only because the sums were easy.
+
+**Text answers were all supported, and mixed answers weren't.** All 9 unsupported sentences are in mixed answers. When a question gives the LLM a figure and asks why, it wants to connect them, and it reaches further than the sources go. That's the system's clearest weakness.
+
+**The grader's own story.** Graded one answer at a time, it reported 97% and passed both known mistakes, although it had caught them when tested alone. Asked about many sentences at once it was lenient, so it was changed to one sentence per call, and the score fell to 91%. Merck is now caught. The exact Chevron sentence still isn't: the passage says the absence of a charge offset the decline, and the answer says it reduced earnings. Treat 91% as a ceiling.
+
+**Three bugs in my own scoring,** all found by reading failures: a table's "Visa" check looked for a name in a column of tickers, CSV commas turned `2024-12-31,248.62` into 31,248.62, and "$17.528 billion" was flagged as new because the table had 17528000000.
+
+## Limitations
+
+1. **Small and self-written.** I wrote the number questions knowing the schema, so they're fairer to the SQL than real users are.
+2. **The grader isn't the truth.** It passed 25 of 25 in testing and still missed a real mistake. It also can't tell a correct explanation from one that's merely supported by a passage.
+3. **43 claims carry no citation.** Mostly bullets under a cited sentence, but nothing checks them.
+4. **Sign errors can pass.** The number check ignores minus signs, because answers write "a loss of $2 billion". I read all 40 number answers by hand and found none.
+5. **The database has a known bug.** Earnings per share is wrong across stock splits (`docs/06_web_app.md`), so those figures were kept out of the questions.
+6. **Free-tier limits.** Only 20 of the 50 text questions were answered in full, to stay within the daily tokens. The other 30 only test the router, and those are still finishing.
+
+**Rerun part 2:**
+
+```
+python -m filinglens.evaluation.answer_eval               # asks whatever is missing, then the summary
+python -m filinglens.evaluation.answer_eval --summary     # no LLM calls
+python -m filinglens.evaluation.faithfulness --check-grader
+python -m filinglens.evaluation.faithfulness
+```
+
+## Interview questions, part 2
+
+- **How do you check a number answer automatically?** The expected value comes from my own SQL. I compare it with the answer, allowing only for the rounding the answer shows, and run the same check on the SQL's table to separate a bad query from a bad write-up.
+- **What's faithfulness, and why isn't accuracy enough?** It asks whether the sources support what the answer says. An answer can have the right number and an invented reason, as my Merck answer did, and a number check won't see that.
+- **How did you know the grader could be trusted?** I tested it on sentences with known verdicts, including wrong ones I planted. It still wasn't enough: it passed real mistakes when grading whole answers, so I changed it to one sentence at a time, and the score dropped from 97% to 91%. I reported the lower number.
+- **What's the weakest part of the system?** Explaining why something changed. Text answers were fully supported, but all the unsupported sentences were in mixed answers, where the LLM links a figure to a reason.
+- **What does it cost?** About $1.27 per 1,000 questions at list price. A mixed question costs about twice a number question, because it reads eight passages too.
+- **What would you fix first?** Make a "can't answer" from the database fall back to the reports, then have the answer step quote its reason, so an explanation can be checked word for word.

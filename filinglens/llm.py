@@ -227,8 +227,8 @@ def _generate_groq(model: str, system: str, prompt: str) -> tuple[str, int, int]
                                      headers={"Authorization": f"Bearer {key}"})
         except requests.Timeout:
             raise LLMError(f"Groq didn't answer within {LLM_TIMEOUT_SECONDS} s. Try again in a few minutes.") from None
-        except requests.ConnectionError:
-            raise LLMError("Can't reach the Groq API. Check your internet connection.") from None
+        except requests.ConnectionError as exc:
+            raise LLMError(f"Can't reach the Groq API. Check your internet connection. ({str(exc)[:300]})") from None
         if response.ok:
             break
         wait = _wait_before_retry(response.status_code, response.headers, attempt)

@@ -1,0 +1,25 @@
+{"sentence": "Meta states that the European Copyright Directive, the EU directive adopted in April 2019, expanded online platform liability for copyright infringement [1].", "sources": ["META-2024-1A-0106"], "supported": true, "kind": "original"}
+{"sentence": "Argentina's central bank enacted the foreign currency controls that affect the Cerro Negro mine on September 1, 2019 [1].", "sources": ["NEM-2020-7-0049"], "supported": true, "kind": "original"}
+{"sentence": "Live Nation said it would continue to use Tier 5 routes for touring into the United Kingdom, now including EU and EEA musicians and crew on its sponsor's license [1].", "sources": ["LYV-2020-1A-0037"], "supported": true, "kind": "original"}
+{"sentence": "The weighted average interest rate on commercial paper borrowings was 4.8% for the year ended December 31, 2023 [1].", "sources": ["O-2023-8-0052"], "supported": true, "kind": "original"}
+{"sentence": "When Peru issued a COVID-19 decree in mid-March 2020, Freeport-McMoRan moved its Cerro Verde mine to care and maintenance status and prioritized critical activities [1].", "sources": ["FCX-2022-1A-0046"], "supported": true, "kind": "original"}
+{"sentence": "Intel's 2023 revenue was $54.2 billion, down $8.8 billion, or 14%, from 2022 [1].", "sources": ["INTC-2023-BODY-0081"], "supported": true, "kind": "original"}
+{"sentence": "Meta's total revenue for 2022 was $116.61 billion, a decrease of 1% compared to 2021 [1].", "sources": ["META-2022-7-0002"], "supported": true, "kind": "original"}
+{"sentence": "Meta's effective tax rate rose from 16.7% in 2021 to 19.5% in 2022 [1].", "sources": ["META-2022-7-0041"], "supported": true, "kind": "original"}
+{"sentence": "Tesla's automotive regulatory credits revenue rose $311 million, or 21%, in 2022 [1].", "sources": ["TSLA-2022-7-0021"], "supported": true, "kind": "original"}
+{"sentence": "Tesla's automotive sales revenue rose $23.09 billion, or 52%, on 347,024 more Model 3 and Model Y deliveries and 38,183 more Model S and Model X deliveries [1].", "sources": ["TSLA-2022-7-0020"], "supported": true, "kind": "original"}
+{"sentence": "NVIDIA's revenue for fiscal 2024 was $60.9 billion, up 126% from a year ago [1].", "sources": ["NVDA-2024-7-0008"], "supported": true, "kind": "original"}
+{"sentence": "Crude oil and product purchases decreased in 2023 primarily because of lower commodity prices [1].", "sources": ["CVX-2023-14-0026"], "supported": true, "kind": "original"}
+{"sentence": "Meta states that the European Copyright Directive, adopted in April 2020, expanded online platform liability for copyright infringement [1].", "sources": ["META-2024-1A-0106"], "supported": false, "kind": "changed figure"}
+{"sentence": "Argentina's central bank enacted the foreign currency controls that affect the Cerro Negro mine on September 1, 2018 [1].", "sources": ["NEM-2020-7-0049"], "supported": false, "kind": "changed figure"}
+{"sentence": "The weighted average interest rate on commercial paper borrowings was 5.8% for the year ended December 31, 2023 [1].", "sources": ["O-2023-8-0052"], "supported": false, "kind": "changed figure"}
+{"sentence": "Intel's 2023 revenue was $54.2 billion, down $8.8 billion, or 41%, from 2022 [1].", "sources": ["INTC-2023-BODY-0081"], "supported": false, "kind": "changed figure"}
+{"sentence": "Tesla's automotive regulatory credits revenue rose $511 million, or 21%, in 2022 [1].", "sources": ["TSLA-2022-7-0021"], "supported": false, "kind": "changed figure"}
+{"sentence": "Meta's effective tax rate fell from 19.5% in 2021 to 16.7% in 2022 [1].", "sources": ["META-2022-7-0041"], "supported": false, "kind": "reversed"}
+{"sentence": "NVIDIA's revenue for fiscal 2024 was $60.9 billion, down 126% from a year ago [1].", "sources": ["NVDA-2024-7-0008"], "supported": false, "kind": "reversed"}
+{"sentence": "Live Nation said it would stop using Tier 5 routes for touring into the United Kingdom [1].", "sources": ["LYV-2020-1A-0037"], "supported": false, "kind": "reversed"}
+{"sentence": "Tesla's automotive sales rose on 347,024 more Model 3 and Model Y deliveries [1].", "sources": ["TSLA-2022-7-0021"], "supported": false, "kind": "wrong passage"}
+{"sentence": "Booking says the European Copyright Directive expanded online platform liability [1].", "sources": ["BKNG-2023-1A-0063"], "supported": false, "kind": "wrong passage"}
+{"sentence": "Freeport-McMoRan moved its Cerro Verde mine to care and maintenance status and laid off 5,000 employees [1].", "sources": ["FCX-2022-1A-0046"], "supported": false, "kind": "added claim"}
+{"sentence": "The 2022 write-off and impairment charges were absent in 2023, reducing overall earnings [1].", "sources": ["CVX-2023-14-0028"], "supported": false, "kind": "real mistake by the app"}
+{"sentence": "The 2023 filing notes the spin-off of Organon & Co., a major divestiture that removed a sizable earnings contribution from the 2023 results [1].", "sources": ["MRK-2023-8-0004"], "supported": false, "kind": "real mistake by the app"}
