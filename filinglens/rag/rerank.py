@@ -18,7 +18,7 @@ import os
 from dataclasses import replace
 
 from filinglens.rag.embeddings import MODEL_DIR, passage_text
-from filinglens.rag.vector_store import SearchResult
+from filinglens.rag.passage import SearchResult
 
 MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L6-v2"
 

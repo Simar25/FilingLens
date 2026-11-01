@@ -15,7 +15,7 @@ from collections.abc import Callable
 
 from filinglens.llm import LLMReply
 from filinglens.rag.answer import format_sources
-from filinglens.rag.vector_store import SearchResult
+from filinglens.rag.passage import SearchResult
 from filinglens.sql.text_to_sql import SqlResult
 
 DB_CITATION = "[DB]"

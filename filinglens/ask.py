@@ -37,7 +37,7 @@ from filinglens.assistant import DEFAULT_SEARCH, SEARCH_MODES, Assistant, Respon
 from filinglens.charts import save_chart
 from filinglens.combine import DB_CITATION
 from filinglens.config import PROJECT_ROOT
-from filinglens.rag.vector_store import SearchResult
+from filinglens.rag.passage import SearchResult
 from filinglens.router import ROUTES
 
 PREVIEW_CHARS = 220

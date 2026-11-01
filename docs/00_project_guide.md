@@ -10,8 +10,8 @@ This is the full plan, from an empty folder to a deployed app on your resume. Ti
  Step 2  Read the reports + RAG      <- in progress (code built; your checks next)
  Step 3  Text-to-SQL + router        <- in progress (code built; your checks next)
  Step 4  Research study              <- in progress (code built; your checks next)
- Step 5  Evaluation + better search
- Step 6  Web app + deployment
+ Step 5  Evaluation + better search  DONE (the last router questions are finishing)
+ Step 6  Web app + deployment        <- app built; one last step on Streamlit Community Cloud
  Final   Resume, demo, interview prep
 ```
 
@@ -238,10 +238,10 @@ Example of the table you'll produce (your real numbers will differ):
 
 | # | Part | What it does |
 |---|---|---|
-| 6.1 | API | FastAPI backend: an `/ask` endpoint that runs the whole system |
-| 6.2 | Web interface | Streamlit app with 3 tabs: **Ask** (answer, citations, chart), **Explore** (pick a company and metric, see the chart), **Research** (your findings) |
-| 6.3 | Docker | Packages the app so it runs the same on any computer (needs Docker Desktop on Windows) |
-| 6.4 | Deployment | Hugging Face Spaces (free). Uses an LLM API, since there's no GPU there. Your API key goes in the Space's secret settings, never in the code. |
+| 6.1 | API | Left out: the app calls the Assistant directly, and nothing else needs an API yet (`docs/06_web_app.md`) |
+| 6.2 | Web interface | Built: Streamlit app with 3 tabs: **Ask** (answer, citations, chart), **Explore** (pick a company and metric, see the chart), **Research** (your findings). Run it with `python -m streamlit run app.py` |
+| 6.3 | Docker | Left out: the free host below runs Streamlit apps directly |
+| 6.4 | Deployment | Free on Streamlit Community Cloud, with a lighter search (Hugging Face's Docker Spaces now cost $9 a month). Steps in `docs/06_web_app.md`. Your API key goes in the app's secret settings, never in the code. |
 | 6.5 | Automatic tests | GitHub Actions runs `pytest` every time you push code |
 | 6.6 | Polished README | Demo GIF, architecture diagram, results table, live link |
 
@@ -281,4 +281,4 @@ Example of the table you'll produce (your real numbers will differ):
 | 3 | sqlglot, plotly |
 | 4 | transformers (FinBERT), statsmodels, scikit-learn, scipy, matplotlib, ipykernel (notebooks) |
 | 5 | rank-bm25, a cross-encoder reranker model |
-| 6 | fastapi, uvicorn, streamlit, Docker Desktop |
+| 6 | streamlit |

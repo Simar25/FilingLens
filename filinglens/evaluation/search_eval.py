@@ -22,7 +22,7 @@ import pandas as pd
 from filinglens.assistant import SEARCH_MODES, Assistant
 from filinglens.evaluation.draft_questions import EVAL_DIR, QUESTIONS_PATH
 from filinglens.rag.filters import Filters
-from filinglens.rag.vector_store import SearchResult
+from filinglens.rag.passage import SearchResult
 
 RESULTS_PATH = EVAL_DIR / "search_results.csv"
 TOP = 10

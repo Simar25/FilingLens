@@ -1,0 +1,38 @@
+[server]
+headless = true
+enableStaticServing = true  # serves static/, which holds the fonts
+fileWatcherType = "none"  # don't scan every file of PyTorch and transformers for changes
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"  # no Deploy button for visitors
+
+# A trading terminal: black screen, amber labels, green and red for up and down. The shapes are in app.css.
+[theme]
+base = "dark"
+primaryColor = "#FFA028"
+backgroundColor = "#000000"
+secondaryBackgroundColor = "#101418"
+textColor = "#E8E4D9"
+linkColor = "#FFA028"
+borderColor = "#3B3224"
+showWidgetBorder = true
+baseRadius = "none"
+orangeColor = "#FFA028"
+greenColor = "#00D37F"
+redColor = "#FF433D"
+font = "IBM Plex Mono"
+headingFont = "IBM Plex Mono"
+codeFont = "IBM Plex Mono"
+
+[[theme.fontFaces]]
+family = "IBM Plex Mono"
+url = "app/static/fonts/ibm-plex-mono-latin-400-normal.woff2"
+weight = 400
+
+[[theme.fontFaces]]
+family = "IBM Plex Mono"
+url = "app/static/fonts/ibm-plex-mono-latin-600-normal.woff2"
+weight = 600

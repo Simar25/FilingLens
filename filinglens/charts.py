@@ -116,7 +116,7 @@ def make_chart(table: pd.DataFrame, title: str) -> go.Figure | None:
 
     # When every line shows the same column (one per company), say which; otherwise the legend names them.
     measure = readable(column) if all(value == column for _, _, value in lines) else ""
-    subtitle = " · ".join(p for p in [measure, "by fiscal year" if x.lower() == "fiscal_year" else ""] if p)
+    subtitle = ", ".join(p for p in [measure, "by fiscal year" if x.lower() == "fiscal_year" else ""] if p)
     wrapped = "<br>".join(textwrap.wrap(title, 70))
     fig.update_layout(
         title={"text": wrapped + (f"<br><sup>{subtitle}</sup>" if subtitle else ""), "x": 0.01, "xanchor": "left",

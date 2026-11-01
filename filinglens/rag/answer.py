@@ -20,7 +20,7 @@ from xml.sax.saxutils import quoteattr
 
 from filinglens.llm import LLMReply
 from filinglens.rag.filters import Filters
-from filinglens.rag.vector_store import SearchResult
+from filinglens.rag.passage import SearchResult
 
 SYSTEM_PROMPT = """\
 You answer questions about US public companies using excerpts from their annual reports (SEC Form 10-K).

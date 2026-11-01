@@ -25,7 +25,7 @@ from filinglens.llm import LLMReply
 from filinglens.rag.answer import answer_question, find_citations
 from filinglens.rag.filters import Filters, detect_filters
 from filinglens.rag.keyword_search import INDEX_PATH, KeywordIndex, reciprocal_rank_fusion
-from filinglens.rag.vector_store import SearchResult
+from filinglens.rag.passage import SearchResult
 from filinglens.router import ROUTES, RouteDecision, route_question
 from filinglens.sql.safety import connect_readonly
 from filinglens.sql.schema import describe_schema

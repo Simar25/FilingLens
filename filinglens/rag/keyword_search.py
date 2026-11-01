@@ -34,7 +34,7 @@ import scipy.sparse as sp
 
 from filinglens.config import PROJECT_ROOT
 from filinglens.rag.filters import Filters
-from filinglens.rag.vector_store import SearchResult
+from filinglens.rag.passage import SearchResult
 
 INDEX_PATH = PROJECT_ROOT / "data" / "processed" / "keyword_index.pkl"
 K1, B = 1.2, 0.75  # the usual BM25 settings
@@ -61,10 +61,11 @@ class KeywordIndex:
         self.analyze = make_vectorizer().build_analyzer()  # question -> words, the same way as the passages
 
     @classmethod
-    def build(cls, chunks: pd.DataFrame, texts: list[str]) -> "KeywordIndex":
-        """`texts[i]` is the text indexed for `chunks.iloc[i]` (the same text the embedding model reads)."""
-        # min_df=2: a word found in only one chunk is mostly a typo or a number, and would double the word list.
-        vectorizer = make_vectorizer(min_df=2, dtype=np.float32)
+    def build(cls, chunks: pd.DataFrame, texts: list[str], min_df: int = 2) -> "KeywordIndex":
+        """`texts[i]` is the text indexed for `chunks.iloc[i]` (the same text the embedding model reads).
+        min_df=2: across all reports, a word found in only one chunk is mostly a typo or a number, and would
+        double the word list. Over one report it could be the very name a question asks about: use 1."""
+        vectorizer = make_vectorizer(min_df=min_df, dtype=np.float32)
         counts = vectorizer.fit_transform(texts).tocoo()  # counts[i, j] = how often word j appears in chunk i
         lengths = np.asarray(counts.sum(axis=1)).ravel()
         doc_freq = np.bincount(counts.col, minlength=counts.shape[1])  # how many chunks contain each word

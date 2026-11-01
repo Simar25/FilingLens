@@ -14,7 +14,6 @@ The database lives in data/processed/chroma/. It is rebuilt from the 'chunks'
 table by `python -m filinglens.build_index`.
 """
 
-from dataclasses import dataclass
 from pathlib import Path
 
 import chromadb
@@ -23,32 +22,11 @@ import pandas as pd
 
 from filinglens.config import PROJECT_ROOT
 from filinglens.rag.filters import Filters
+from filinglens.rag.passage import SearchResult
 
 CHROMA_DIR = PROJECT_ROOT / "data" / "processed" / "chroma"
 COLLECTION = "chunks"
 METADATA_COLUMNS = ["ticker", "company", "fiscal_year", "item", "title", "accession_number", "chunk_index"]
-
-
-@dataclass
-class SearchResult:
-    chunk_id: str
-    ticker: str
-    company: str
-    fiscal_year: int
-    item: str
-    title: str
-    text: str
-    # Higher = better match. What it measures depends on the search that found it: cosine similarity
-    # (vector, 0 to 1), BM25 (keyword), fused rank (hybrid) or the reranker's score.
-    score: float
-
-    @property
-    def section(self) -> str:
-        return self.title if self.item in ("AR", "BODY") else f"Item {self.item} {self.title}"
-
-    @property
-    def label(self) -> str:
-        return f"{self.ticker} 10-K FY{self.fiscal_year}, {self.section}"
 
 
 def build_where(filters: Filters) -> dict | None:

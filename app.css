@@ -1,0 +1,108 @@
+/* A trading terminal with a lens. Colours and the font are in .streamlit/config.toml; this file does
+   what the theme can't: the header and price tape, the market map and its lens, the function keys,
+   and the viewfinder corners that frame an answer. */
+
+:root { --amber: #FFA028; --amber-dim: #6E4E1E; --line: #3B3224; --panel: #101418; --text: #E8E4D9; --dim: #9A958A; --up: #00D37F; --down: #FF433D; }
+
+[data-testid="stDecoration"], [data-testid="stStatusWidget"] { display: none; }
+[data-testid="stHeader"] { background: transparent; height: 0; }
+.stMainBlockContainer { max-width: 1320px; padding: 0.9rem 1.25rem 3rem; }
+.stMainBlockContainer [data-testid="stVerticalBlock"] { gap: 0.6rem; }
+:focus-visible { outline: 2px solid var(--amber) !important; outline-offset: 1px; }
+
+/* Header bar: the name, with LENS in reverse like a key on the terminal's keyboard. */
+.mast { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; border-bottom: 1px solid var(--amber); padding-bottom: 0.45rem; }
+.mast h1, .mast h1 span { color: var(--amber) !important; font-size: 2.4rem !important; font-weight: 600 !important; letter-spacing: 0.06em; line-height: 1; padding: 0 !important; margin: 0; }
+.mast h1 b { background: var(--amber); color: #000; padding: 0 0.16em; margin-left: 0.1em; font-weight: 600; }
+.mast > p, .mast > span { color: var(--dim); font-size: 0.75rem; margin: 0; }
+
+/* The price tape. */
+.tape { overflow: hidden; white-space: nowrap; border-bottom: 1px solid var(--line); padding: 0.2rem 0 0.3rem; font-size: 0.8125rem; }
+.tape div { display: inline-block; animation: tape 110s linear infinite; }
+.tape:hover div { animation-play-state: paused; }
+.tape span { margin-right: 2rem; color: var(--text); }
+.tape b { color: var(--amber); font-weight: 600; }
+.tape i { font-style: normal; }
+.tape .rise { color: var(--up); } .tape .fall { color: var(--down); }
+@keyframes tape { to { transform: translateX(-50%); } }
+
+/* The market map: one square per company, by sector. */
+.st-key-map details { border: 1px solid var(--line); }
+.st-key-map summary { padding: 0.25rem 0.6rem; background: var(--panel); }
+.st-key-map summary p { color: var(--amber); font-size: 0.8125rem; font-weight: 600; }
+.st-key-map [data-testid="stExpanderDetails"] { padding: 0.5rem 0.6rem 0.4rem; }
+.board { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 3px; min-width: 900px; }
+.sector h4 { color: var(--amber); font-family: inherit; font-size: 0.6875rem; font-weight: 600; padding: 0 0 0.2rem; margin: 0; white-space: nowrap; }
+.square { display: flex; justify-content: space-between; align-items: baseline; padding: 0.2rem 0.28rem; margin-bottom: 2px; color: #FFFFFF !important; text-decoration: none !important; font-size: 0.71875rem; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.square b { font-weight: 600; }
+.square span { font-size: 0.625rem; }
+.square:hover, .square:focus-visible { outline: 1px solid var(--amber); }
+.up3 { background: #00864F; } .up2 { background: #0A5E3D; } .up1 { background: #0E3B2B; }
+.down1 { background: #6A2320; } .down2 { background: #B02A26; } .none { background: #1A1F24; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; color: var(--dim); font-size: 0.6875rem; margin: 0.35rem 0 1rem; }
+.legend span { display: inline-flex; align-items: center; gap: 0.3rem; }
+.legend i { width: 0.7rem; height: 0.7rem; display: inline-block; }
+[data-testid="stMarkdownContainer"]:has(.board) { overflow-x: auto; }
+
+/* The lens: follows the mouse over the map and enlarges what's under it. Clicks pass through. */
+.lens { position: fixed; width: 190px; height: 190px; border-radius: 50%; overflow: hidden; pointer-events: none; z-index: 1000; display: none;
+        background: #000; border: 2px solid var(--amber); box-shadow: 0 0 0 4px #000, 0 0 0 5px var(--amber-dim), 0 10px 40px rgba(0, 0, 0, 0.8); }
+.lens .board { transform-origin: 0 0; min-width: 0; }
+.lens::after { content: ""; position: absolute; inset: 0; background: linear-gradient(var(--amber), var(--amber)) center / 14px 1px no-repeat, linear-gradient(var(--amber), var(--amber)) center / 1px 14px no-repeat; opacity: 0.8; }
+
+/* Function keys. */
+[data-testid="stTabs"] [role="tablist"] { gap: 3px; border: 0; box-shadow: none; }
+[data-testid="stTabs"] [role="tablist"]::before, [data-testid="stTabs"] [role="tablist"]::after { display: none; }
+[data-testid="stTabs"] [role="tablist"] + div:not([role="tabpanel"]) { display: none; }
+[data-testid="stTabs"] [role="tab"] { background: var(--panel); padding: 0.3rem 1.1rem; border: 1px solid var(--line); box-shadow: none; }
+[data-testid="stTabs"] [role="tab"] p { color: var(--amber); font-weight: 600; font-size: 0.875rem; }
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] { background: var(--amber); border-color: var(--amber); }
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] p { color: #000; }
+[data-testid="stTabs"] [role="tabpanel"] { padding: 0.8rem 0 0; }
+
+h2, h3 { color: var(--amber) !important; font-size: 1.05rem !important; font-weight: 600 !important; padding: 0.3rem 0 0.1rem !important; }
+[data-testid="stTabs"] [data-testid="stMarkdownContainer"] > p { max-width: 92ch; line-height: 1.6; }
+
+/* Company chips are amber too, so their labels are black as well. */
+[data-testid="stMultiSelectTagsContainer"] > span span { color: #000 !important; font-weight: 600; }
+[data-testid="stMultiSelectTagsContainer"] > span svg { color: #000; fill: #000; }
+
+/* The command line and the examples. Black on amber, the only way that key can be read. */
+.stFormSubmitButton button p { color: #000 !important; font-weight: 600; }
+.st-key-examples { gap: 0; }
+.st-key-examples button { justify-content: flex-start; text-align: left; padding: 0; min-height: 1.55rem; }
+.st-key-examples button p { color: var(--dim); font-size: 0.8125rem; }
+.st-key-examples button:hover p { color: var(--amber); }
+.st-key-examples button p::before { content: "> "; color: var(--amber); }
+
+/* The answer, framed like the view through a lens: corner marks, the question in focus at the top. */
+.st-key-answer { --c: var(--amber); padding: 1rem 1.3rem 1.05rem; background:
+    linear-gradient(var(--c), var(--c)) 0 0 / 34px 2px no-repeat, linear-gradient(var(--c), var(--c)) 0 0 / 2px 34px no-repeat,
+    linear-gradient(var(--c), var(--c)) 100% 0 / 34px 2px no-repeat, linear-gradient(var(--c), var(--c)) 100% 0 / 2px 34px no-repeat,
+    linear-gradient(var(--c), var(--c)) 0 100% / 34px 2px no-repeat, linear-gradient(var(--c), var(--c)) 0 100% / 2px 34px no-repeat,
+    linear-gradient(var(--c), var(--c)) 100% 100% / 34px 2px no-repeat, linear-gradient(var(--c), var(--c)) 100% 100% / 2px 34px no-repeat,
+    var(--panel); }
+.st-key-note p, .st-key-note li { font-size: 0.9375rem; line-height: 1.72; max-width: 78ch; }
+.st-key-note strong { color: #FFFFFF; font-weight: 600; }
+.st-key-focus p { color: var(--amber); font-size: 0.8125rem; font-weight: 600; }
+
+/* Sources, in the margin of the frame. */
+.st-key-sources p { font-size: 0.8125rem; }
+.st-key-sources [data-testid="stExpander"] details { border: 0; border-top: 1px solid var(--line); }
+.st-key-sources [data-testid="stExpander"] summary { padding-left: 0; padding-right: 0; background: transparent; }
+.st-key-sources [data-testid="stExpanderDetails"] { padding-left: 0; padding-right: 0; max-height: 20rem; overflow-y: auto; }
+.st-key-sources [data-testid="stExpanderDetails"] p { font-size: 0.75rem; line-height: 1.5; }
+
+/* Tables: dense, banded, figures aligned on the right. */
+[data-testid="stTable"] table { border: 0; font-variant-numeric: tabular-nums; font-size: 0.875rem; }
+[data-testid="stTable"] th, [data-testid="stTable"] td { border: 0; padding: 0.3rem 0.7rem; }
+[data-testid="stTable"] thead th { background: var(--panel); border-bottom: 1px solid var(--amber); color: var(--amber); font-weight: 600; text-align: right; }
+[data-testid="stTable"] td { text-align: right; }
+[data-testid="stTable"] thead th:first-child, [data-testid="stTable"] tbody th { text-align: left; }
+[data-testid="stTable"] tbody th { background: transparent; color: var(--amber); font-weight: 400; white-space: nowrap; }
+[data-testid="stTable"] tbody tr:nth-child(odd) th, [data-testid="stTable"] tbody tr:nth-child(odd) td { background: #0D1114; }
+
+/* The research charts are printed on white: invert them for the black screen, keeping their colours. */
+[data-testid="stImage"] img { filter: invert(1) hue-rotate(180deg) brightness(1.1); border: 1px solid var(--line); }
+
+@media (prefers-reduced-motion: reduce) { .tape div { animation: none; } }

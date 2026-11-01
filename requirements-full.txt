@@ -1,0 +1,35 @@
+requests>=2.32
+pandas>=2.2
+duckdb>=1.2
+yfinance>=0.2.54
+python-dotenv>=1.0
+pyyaml>=6.0
+pytest>=8.0
+
+# Step 2: reading reports and RAG
+beautifulsoup4>=4.12
+lxml>=5.0
+sentence-transformers>=5.0
+chromadb>=1.0
+google-genai>=2.0
+# PyTorch for your NVIDIA GPU: install it BEFORE this file, from PyTorch's own server
+# (plain `pip install torch` gives the slower CPU-only version on Windows):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu130
+
+# Step 3: text-to-SQL and charts
+sqlglot>=30.0
+plotly>=6.0
+
+# Step 4: research study
+transformers>=4.45      # FinBERT (also installed with sentence-transformers)
+scikit-learn>=1.5       # English stop-word list
+scipy>=1.13             # correlations and t-tests
+statsmodels>=0.14       # regressions with clustered standard errors
+matplotlib>=3.9         # charts saved as PNG for docs/ and the notebook
+ipykernel>=6.29         # runs notebooks/04_research_study.ipynb in VS Code
+
+# India pilot: annual reports from NSE are PDFs
+pymupdf>=1.24           # PDF text and bookmarks (license: AGPL-3.0 or commercial)
+
+# Step 6: web app
+streamlit>=1.66
