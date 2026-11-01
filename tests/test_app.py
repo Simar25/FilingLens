@@ -6,7 +6,8 @@ from streamlit.testing.v1 import AppTest
 from test_sql import db_path, scripted_llm  # noqa: F401 (db_path is a fixture)
 
 from filinglens.assistant import Assistant
-from filinglens.llm import LLMError
+from filinglens.charts import growth_label
+from filinglens.llm import LLMError, QuotaError
 
 APP = str(Path(__file__).parent.parent / "app.py")
 SQL = ("```sql\nSELECT ticker, fiscal_year, ROUND(revenue / 1e9, 2) AS revenue_bn FROM financials_wide "
@@ -94,3 +95,25 @@ def test_a_missing_database_gets_a_plain_message(monkeypatch):
     st.cache_resource.clear()
     app = AppTest.from_file(APP, default_timeout=30).run()
     assert "no database file" in app.error[0].value
+
+
+def test_growth_labels_never_show_minus_zero():
+    labels = [growth_label(g) for g in (0.446, -0.005, -0.0003, 0.0002, -0.12)]
+    assert labels == ["+45%", "-0.5%", "0.0%", "0.0%", "-12%"]
+
+
+@pytest.mark.parametrize("error, message", [(QuotaError("limit reached, see .env"), "quota is used up"),
+                                            (LLMError("rejected the API key"), "isn't responding")])
+def test_online_visitors_see_a_plain_message_for_each_kind_of_llm_failure(run_app, monkeypatch, capsys, error, message):
+    def fails(system, prompt):
+        raise error
+
+    app = run_app(fails)  # builds the fake Assistant the online branch below reuses
+    monkeypatch.setattr("filinglens.online.ONLINE", True)
+    monkeypatch.setattr("filinglens.online.OnlineAssistant", __import__("filinglens.assistant").assistant.Assistant)
+    st.cache_resource.clear()
+    app = AppTest.from_file(APP, default_timeout=30).run()
+    app.text_input(key="question").set_value("Anything?")
+    app = click(app, "GO")
+    assert message in app.error[0].value and ".env" not in app.error[0].value
+    assert str(error) in capsys.readouterr().err  # the real reason still reaches the app's logs

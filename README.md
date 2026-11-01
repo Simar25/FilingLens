@@ -2,6 +2,8 @@
 
 Ask questions about US companies' annual reports (10-Ks) and get answers that cite the filing they came from.
 
+**[Try it live](https://filinglens-wc72wkjyoe8hnzm25azc7h.streamlit.app/)**. Name a company in your question: the free online version searches that company's reports, with a simpler search than the full version.
+
 Some questions need numbers ("compare NVIDIA's and AMD's gross margins since 2021"), some need the text ("what supply chain risks did Apple describe in 2024?"), and some need both ("how did Apple's R&D spending change, and why?"). FilingLens routes each question accordingly. Numbers come from SQL over a DuckDB database built from SEC XBRL data. Text comes from a search over the report passages, and the LLM answers only from the passages it was given, citing each one.
 
 The data: 594 10-K filings from 99 large US companies (fiscal years 2020 to 2025), split into about 190,000 passages, plus their financial statements and daily stock prices. All of it is free and public: SEC EDGAR for filings and financials, Yahoo Finance for prices and sectors.
@@ -149,7 +151,6 @@ tests/          offline tests on SEC-shaped sample data
 
 ## What's next
 
-- When the database can't answer a question, fall back to the reports instead of stopping.
 - Make mixed answers quote their reasons, so an explanation can be checked word for word.
 - Fix earnings per share across stock splits ([details](docs/06_web_app.md#the-data-bug-found-along-the-way)).
 

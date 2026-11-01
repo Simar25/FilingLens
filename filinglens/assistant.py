@@ -57,6 +57,7 @@ class Response:
     chart: go.Figure | None = None
     calls: list[tuple[str, LLMReply]] = field(default_factory=list)  # every LLM call: (stage, reply), in order
     search_seconds: float = 0.0               # report search, including loading the model the first time
+    read_reports_instead: bool = False        # the database couldn't answer, so the reports were read
 
 
 class Assistant:
@@ -144,16 +145,24 @@ class Assistant:
             decision = route_question(question, self.generate)
         response = Response(question, decision, calls=[("router", decision.reply)] if decision.reply else [])
 
-        if decision.route in ("numbers", "both"):
+        path = decision.route  # response.route keeps the router's own choice, so its accuracy can be measured
+        if path in ("numbers", "both"):
             response.sql = text_to_sql(question, self.schema, self.con, self.generate)
             response.calls += [("SQL" if i == 0 else "SQL retry", r) for i, r in enumerate(response.sql.replies)]
-        if decision.route in ("text", "both"):
+            if path == "numbers" and not route and response.sql.cannot_answer and self.filters_for(question, tickers).tickers:
+                path, response.read_reports_instead = "text", True  # a report question sent to the database (Step 5)
+        if path in ("text", "both"):
             response.filters = self.filters_for(question, tickers, years, items)
             start = time.perf_counter()
-            response.sources = self.search(question, response.filters, k, search)
+            try:
+                response.sources = self.search(question, response.filters, k, search)
+            except SetupError:
+                if not response.read_reports_instead:
+                    raise
+                path, response.read_reports_instead = "numbers", False  # no search index here: keep the database's reason
             response.search_seconds = time.perf_counter() - start
 
-        if decision.route == "text":
+        if path == "text":
             answer = answer_question(question, response.sources, response.filters, self.generate)
             response.text, response.cited, response.invalid_citations = (
                 answer.text, answer.cited, answer.invalid_citations)
@@ -174,7 +183,7 @@ class Assistant:
             if sql.cannot_answer:
                 response.text = f"The database can't answer this: {sql.cannot_answer}"
             elif sql.error:
-                response.text = f"No working SQL query after {sql.attempts} tries. Last error: {sql.error}"
+                response.text = "The database query didn't work for this question. Try rewording it."
             else:
                 response.text = NO_DATA_ANSWER
             return

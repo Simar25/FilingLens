@@ -19,7 +19,8 @@ class SearchResult:
 
     @property
     def section(self) -> str:
-        return self.title if self.item in ("AR", "BODY") else f"Item {self.item} {self.title}"
+        # Reports without the usual Items have titles like "Report body (company's own layout)".
+        return self.title.split(" (")[0] if self.item in ("AR", "BODY") else f"Item {self.item} {self.title}"
 
     @property
     def label(self) -> str:

@@ -11,7 +11,7 @@ This is the full plan, from an empty folder to a deployed app on your resume. Ti
  Step 3  Text-to-SQL + router        <- in progress (code built; your checks next)
  Step 4  Research study              <- in progress (code built; your checks next)
  Step 5  Evaluation + better search  DONE (the last router questions are finishing)
- Step 6  Web app + deployment        <- app built; one last step on Streamlit Community Cloud
+ Step 6  Web app + deployment        DONE (live on Streamlit Community Cloud)
  Final   Resume, demo, interview prep
 ```
 

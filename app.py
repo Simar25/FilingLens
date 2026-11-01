@@ -10,6 +10,7 @@ magnifying lens over the market map and the function keys. Online it runs on fil
 """
 
 import html
+import sys
 import threading
 
 import pandas as pd
@@ -17,7 +18,7 @@ import streamlit as st
 
 from filinglens import llm
 from filinglens.assistant import Assistant, Response, SetupError
-from filinglens.charts import THEMES, make_chart
+from filinglens.charts import THEMES, growth_label, make_chart
 from filinglens.config import PROJECT_ROOT
 from filinglens.online import ONLINE, OnlineAssistant
 from filinglens.rag.answer import CITATION
@@ -33,6 +34,8 @@ METRICS = {"Revenue": ("revenue / 1e9", "bn"), "Net income": ("net_income / 1e9"
            "Operating margin": ("operating_margin * 100", "pct"), "Net margin": ("net_margin * 100", "pct"),
            "Revenue growth": ("revenue_growth * 100", "pct")}
 MAX_COMPANIES = 8  # the chart's limit: more lines can't be told apart
+BUSY = "The free AI quota is used up for now, so try again later. The market map, Explore and Research still work."
+UNAVAILABLE = "The AI service isn't responding right now, so try again later. The market map, Explore and Research still work."
 SOURCE_OF_ROUTE = {"numbers": "the database", "text": "the reports", "both": "the database and the reports"}
 MEASURED = pd.DataFrame(
     [("Right passage in the top 5 results", "94%", "50 search questions"),
@@ -74,8 +77,7 @@ def board(assistant: Assistant) -> str:
         squares = []
         for row in companies.itertuples():
             band, _ = growth_band(row.revenue_growth)
-            # One decimal under 1%: a whole number would show a small fall as "-0%".
-            figure = "" if band == "none" else f"{row.revenue_growth:+.{abs(row.revenue_growth) < 0.01:d}%}"
+            figure = "" if band == "none" else growth_label(row.revenue_growth)
             name = html.escape(assistant.companies.get(row.ticker, row.ticker).split(" /")[0], quote=True)
             squares.append(f'<a class="square {band}" href="?company={row.ticker}" target="_self" title="{name}">'
                            f'<b>{row.ticker}</b><span>{figure}</span></a>')
@@ -171,6 +173,8 @@ def show_answer(response: Response) -> None:
                     if sql.ok:
                         st.dataframe(sql.table, hide_index=True)
                     st.code(sql.sql, language="sql")
+                    if sql.error and not ONLINE:
+                        st.caption(sql.error)
             for number in response.cited:
                 source = response.sources[number - 1]
                 with st.expander(f":orange[✓ {number}] {source.label}"):
@@ -182,7 +186,8 @@ def show_answer(response: Response) -> None:
     replies = [reply for _, reply in response.calls]
     seconds = sum(reply.seconds for reply in replies) + response.search_seconds
     tokens = sum(reply.input_tokens + reply.output_tokens for reply in replies)
-    st.caption(f"Answered from {SOURCE_OF_ROUTE[response.route.route]} in {seconds:.0f} s, using {tokens:,} tokens.")
+    route = "text" if response.read_reports_instead else response.route.route
+    st.caption(f"Answered from {SOURCE_OF_ROUTE[route]} in {seconds:.0f} s, using {tokens:,} tokens.")
 
 
 def ask_tab(assistant: Assistant, lock: threading.Lock) -> None:
@@ -202,15 +207,19 @@ def ask_tab(assistant: Assistant, lock: threading.Lock) -> None:
                                     placeholder="Ask about a figure, the wording of a report, or why something changed")
         asked = button.form_submit_button("GO", type="primary", width="stretch")
     if ONLINE:
-        question_area.caption("Name a company in your question: the online version searches that company's reports.")
+        question_area.caption("Name a company from the map in your question: the online version searches its reports.")
     if (asked or picked) and question.strip():
         with st.spinner("Reading the reports and the numbers..."), lock:
             try:
                 st.session_state.response = assistant.ask(question.strip())
                 st.rerun()  # draws the page again with the map folded away, so the answer is near the top
-            except (llm.LLMError, SetupError) as exc:
+            except SetupError as exc:
                 st.session_state.pop("response", None)
-                st.error(str(exc))
+                st.info(str(exc))
+            except llm.LLMError as exc:
+                st.session_state.pop("response", None)
+                print(f"LLM error: {exc}", file=sys.stderr)  # the real reason, for the app's logs
+                st.error(str(exc) if not ONLINE else BUSY if isinstance(exc, llm.QuotaError) else UNAVAILABLE)
     if "response" in st.session_state:  # kept here so moving to another tab doesn't lose the answer
         show_answer(st.session_state.response)
 

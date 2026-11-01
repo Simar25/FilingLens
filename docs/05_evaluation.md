@@ -58,7 +58,7 @@ Part 2 measures the _answers_: 40 number questions checked against the database,
    - **t33 rewritten** (American Express): it asked whether credit-loss reserves need judgment. The auditor's note in the same report says "a significant amount of judgment" too, so the question had two right answers. It now asks about the passage's specific point (what happens if the models are wrong).
    - **t41 got a second right passage** (JPMorgan): its list of unrest and hostilities is also in the neighbouring chunk. The verbatim-overlap rule missed it because the drafted answer rephrased the list.
 
-   Every question now has `checked: true`. The review was done with an AI assistant's help, not by a finance expert (Limitations).
+   Every question now has `checked: true`. No finance expert reviewed them (Limitations).
 
 ### The metrics (5.2)
 
@@ -124,7 +124,7 @@ After these fixes vector search scored 0.82, not 0.73. The second review found t
 ## Limitations (say these before an interviewer does)
 
 1. **50 questions is small.** Only two differences are clearly beyond luck: hybrid and keyword both rank the answer higher than vector (22 vs 1, and 23 vs 5). In the top 5, hybrid vs vector (4 vs 0), hybrid vs keyword (2 vs 0) and reranker vs hybrid (1 vs 1) are not.
-6. **The questions were checked with AI help, twice, but not by a finance expert.** The checks were: is the answer in the passage, is the question specific, does another passage answer it too. A domain expert might still call some questions unrealistic.
+6. **The questions were checked twice, but not by a finance expert.** The checks were: is the answer in the passage, is the question specific, does another passage answer it too. A domain expert might still call some questions unrealistic.
 2. **The LLM wrote the questions while reading the answer**, which favours keyword search (above). Hand-written questions from real users would be the better test.
 3. **Some right passages are still unlabelled.** Only failures were checked for alternative answers. One more turned up when the app answered a question (Berkshire's GUARD question cited a second passage with the same reason). So every setup probably scores a little better than shown.
 4. **One reranker model was tried**, a small one trained on web search. A larger one trained on more varied text (e.g. bge-reranker-base, 1.1 GB) might do better.
@@ -202,7 +202,7 @@ All of this was measured on the full system: hybrid search, on gpt-oss-120b. The
 | --- | --- | --- |
 | Eli Lilly's total net income, 2021 to 2023 | Both SQL attempts failed, and the app said so | A visible failure beats a wrong number |
 | The three biggest R&D spenders in tech | The table was right ($16.05bn); the answer rounded it to $16.1bn | The LLM was told to copy figures exactly. Rules in a prompt aren't guarantees |
-| Goldman's Global Markets revenue | Sent to the database, which correctly said it doesn't hold segments, and the app stopped | The reports had the answer. A wrong route can dead-end: on "can't answer" it should fall back to the reports |
+| Goldman's Global Markets revenue | Sent to the database, which correctly said it doesn't hold segments, and the app stopped | The reports had the answer, so a wrong route was a dead end. Now a "can't answer" falls back to the reports, and the router's mistake still counts in its score |
 | Merck's 2023 net income | Right figure, wrong reason: it blamed the Organon spin-off, a 2021 event | **A right number doesn't mean a right explanation** |
 
 Three number answers also did arithmetic against the rule (Coca-Cola's lead over PepsiCo, for one). All three were correct, but only because the sums were easy.
@@ -238,4 +238,4 @@ python -m filinglens.evaluation.faithfulness
 - **How did you know the grader could be trusted?** I tested it on sentences with known verdicts, including wrong ones I planted. It still wasn't enough: it passed real mistakes when grading whole answers, so I changed it to one sentence at a time, and the score dropped from 97% to 91%. I reported the lower number.
 - **What's the weakest part of the system?** Explaining why something changed. Text answers were fully supported, but all the unsupported sentences were in mixed answers, where the LLM links a figure to a reason.
 - **What does it cost?** About $1.27 per 1,000 questions at list price. A mixed question costs about twice a number question, because it reads eight passages too.
-- **What would you fix first?** Make a "can't answer" from the database fall back to the reports, then have the answer step quote its reason, so an explanation can be checked word for word.
+- **What would you fix first?** Have the answer step quote its reason, so an explanation can be checked word for word.

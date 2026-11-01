@@ -72,6 +72,10 @@ class LLMError(RuntimeError):
     """A problem worth showing to the user as-is (missing key, Ollama not running...)."""
 
 
+class QuotaError(LLMError):
+    """The provider's free-tier limit is used up: waiting helps, unlike with other LLM errors."""
+
+
 @dataclass
 class LLMReply:
     text: str
@@ -137,9 +141,9 @@ def _limit_or_server_error(name: str, model: str, status: int, headers, message:
     if status == 429:
         wait = _requested_wait(headers)
         if wait is not None and wait > MAX_WAIT_SECONDS:
-            return LLMError(f"{name}'s free-tier limit for {model} is used up. {name} says: {message}\n{SWITCH_HINT}")
-        return LLMError(f"{name} free-tier limit reached (requests or tokens per minute), still after {LLM_RETRIES} "
-                        f"retries. Wait a minute and try again. {name} says: {message}")
+            return QuotaError(f"{name}'s free-tier limit for {model} is used up. {name} says: {message}\n{SWITCH_HINT}")
+        return QuotaError(f"{name} free-tier limit reached (requests or tokens per minute), still after {LLM_RETRIES} "
+                          f"retries. Wait a minute and try again. {name} says: {message}")
     if status >= 500:
         return LLMError(f"{name} is overloaded or down right now (error {status}, still failing after "
                         f"{LLM_RETRIES} retries). Try again in a few minutes.\n{SWITCH_HINT}")

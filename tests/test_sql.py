@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from filinglens import database
-from filinglens.assistant import NO_DATA_ANSWER, Assistant
+from filinglens.assistant import NO_DATA_ANSWER, Assistant, SetupError
 from filinglens.charts import make_chart, save_chart
 from filinglens.combine import build_prompt
 from filinglens.llm import LLMReply
@@ -298,3 +298,35 @@ def test_both_route_combines_sql_and_passages(db_path):
         response = assistant.ask("How did NVIDIA's revenue change, and why?", route="both")
     assert response.filters.tickers == ["NVDA"]
     assert (response.cites_db, response.cited, response.invalid_citations) == (True, [1], [])
+
+
+class WithReports(Assistant):
+    def search(self, question, filters, k=8, mode="hybrid"):
+        return [SearchResult("x", "NVDA", "NVIDIA CORP", 2023, "7", "MD&A", "Segment revenue rose.", 1.0)]
+
+
+ROUTED_TO_NUMBERS = '{"route": "numbers", "reason": "segment figure"}'
+
+
+def test_a_report_question_sent_to_the_database_falls_back_to_the_reports(db_path):
+    generate = scripted_llm(ROUTED_TO_NUMBERS, "CANNOT_ANSWER: no segment data", "Segment revenue rose [1].")
+    with WithReports(db_path, generate) as assistant:
+        response = assistant.ask("What was NVIDIA's segment revenue in 2023?")
+    assert response.text == "Segment revenue rose [1]." and response.cited == [1] and response.read_reports_instead
+    assert response.route.route == "numbers"  # the router's own choice stays on record, so its mistake still counts
+
+
+def test_a_route_chosen_by_the_user_is_kept_when_the_database_cannot_answer(db_path):
+    with WithReports(db_path, scripted_llm("CANNOT_ANSWER: no segment data")) as assistant:
+        response = assistant.ask("What was NVIDIA's segment revenue in 2023?", route="numbers")
+    assert response.text == "The database can't answer this: no segment data" and not response.read_reports_instead
+
+
+def test_without_a_search_index_the_database_reason_is_kept(db_path):
+    class NoIndex(Assistant):
+        def search(self, question, filters, k=8, mode="hybrid"):
+            raise SetupError("The vector database is empty.")
+
+    with NoIndex(db_path, scripted_llm(ROUTED_TO_NUMBERS, "CANNOT_ANSWER: no segment data")) as assistant:
+        response = assistant.ask("What was NVIDIA's segment revenue in 2023?")
+    assert response.text == "The database can't answer this: no segment data" and not response.read_reports_instead

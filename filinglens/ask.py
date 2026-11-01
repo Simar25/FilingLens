@@ -83,6 +83,7 @@ def print_sql(response: Response) -> None:
     print("\nSQL (written by the LLM, checked before it ran):" if sql.ok else "\nSQL that failed:")
     print(textwrap.indent(sql.sql or "(none)", "    "))
     if not sql.ok:
+        print(f"Last error: {sql.error}")
         return
     table = sql.table
     more = " (more were cut off by the row limit)" if sql.truncated else ""

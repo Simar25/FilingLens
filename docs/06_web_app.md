@@ -31,7 +31,7 @@ The app is a **trading terminal with a lens**, because the name is FilingLens: f
 - **Function keys.** F1, F2 and F3 really switch tabs, and GO is what a terminal's enter key says.
 - **Financial conventions.** Explore prints losses in brackets and missing values as a dash, as a financial statement does.
 
-**Earlier versions, and why they went.** The first looked like every other Streamlit app. The second was a pale "editorial" page with a serif title, which is what AI tools tend to produce. The third was a green auditor's desk: better, but still too quiet. The lesson was to stop decorating and start from what the product is.
+**Earlier versions, and why they went.** The first looked like every other Streamlit app. The second was a pale "editorial" page with a serif title, tidy but forgettable. The third was a green auditor's desk: better, but still too quiet. The lesson was to stop decorating and start from what the product is.
 
 ## Decisions worth explaining
 
@@ -53,6 +53,8 @@ The app is a **trading terminal with a lens**, because the name is FilingLens: f
 - **"Free hosting" wasn't.** The plan assumed Hugging Face Spaces were free. They no longer are for this kind of app, so the online version moved to Streamlit Community Cloud. Check the provider's current docs before planning around a price.
 
 ## Putting it online for free
+
+**It's live at https://filinglens-wc72wkjyoe8hnzm25azc7h.streamlit.app/**
 
 **Why not the full version?** The full app needs the embedding model, PyTorch and 4.8 GB of data. Hugging Face was the original plan, but [its docs](https://huggingface.co/docs/hub/en/spaces-overview) now say Docker Spaces need a paid plan ([$9 a month](https://huggingface.co/pricing)). [Streamlit Community Cloud](https://docs.streamlit.io/deploy/streamlit-community-cloud) is free and runs Streamlit apps straight from a GitHub repository, but with up to 2.7 GB of memory.
 

@@ -25,7 +25,8 @@ NICKNAMES = {
     "lilly": "LLY", "j&j": "JNJ", "amex": "AXP", "ge aerospace": "GE", "raytheon": "RTX",
     "john deere": "DE", "southern company": "SO", "air products": "APD", "equity residential": "VMRK",
     "live nation": "LYV", "johnson & johnson": "JNJ", "digital realty": "DLR", "martin marietta": "MLM",
-    "enterprise products": "EPD",
+    "enterprise products": "EPD", "johnson and johnson": "JNJ", "jnj": "JNJ", "att": "T", "amd": "AMD",
+    "pepsi": "PEP",
 }
 # Words dropped from SEC names: "ADVANCED MICRO DEVICES INC" -> "advanced micro devices".
 NAME_SUFFIXES = {"inc", "corp", "corporation", "co", "com", "company", "ltd", "plc", "platforms", "holdings",

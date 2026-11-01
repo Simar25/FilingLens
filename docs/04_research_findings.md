@@ -120,9 +120,9 @@ For each company, the Risk Factors (Item 1A) and MD&A (Item 7) are compared with
 
 | Measure | What it compares | Reacts to | Ignores |
 | --- | --- | --- | --- |
-| **Word counts (cosine)** — the main measure, as in the paper | how often each word appears | a long new risk, a section rewritten | rewording a few sentences |
-| **Word sets (Jaccard)** — also in the paper | which words appear at all | new vocabulary ("tariff", "pandemic") | how often a word is used |
-| **Meaning (embeddings)** — our addition | each ~300-word chunk vs its closest chunk the other year (both directions) | a genuinely new topic | a paragraph reworded with the same meaning |
+| **Word counts (cosine)**: the main measure, as in the paper | how often each word appears | a long new risk, a section rewritten | rewording a few sentences |
+| **Word sets (Jaccard)**: also in the paper | which words appear at all | new vocabulary ("tariff", "pandemic") | how often a word is used |
+| **Meaning (embeddings)**: our addition | each ~300-word chunk vs its closest chunk the other year (both directions) | a genuinely new topic | a paragraph reworded with the same meaning |
 
 Before any returns were looked at, the word measures were cleaned:
 

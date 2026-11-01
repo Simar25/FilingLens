@@ -47,6 +47,11 @@ THEMES = {
 FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif'
 
 
+def growth_label(growth: float) -> str:
+    """+45%, and one decimal under 1%: a whole number would show a small fall as "-0%"."""
+    return "0.0%" if abs(growth) < 0.0005 else f"{growth:+.{abs(growth) < 0.01:d}%}"
+
+
 def unit_of(column: str) -> str | None:
     ending = column.rsplit("_", 1)[-1].lower() if "_" in column else ""
     return ending if ending in UNITS else None

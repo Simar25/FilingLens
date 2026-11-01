@@ -13,6 +13,7 @@ Turn it on with the environment variable FILINGLENS_ONLINE=1 (the deployed app s
 import gzip
 import json
 import os
+import re
 from collections.abc import Callable
 from functools import lru_cache
 
@@ -34,6 +35,11 @@ FACTS_PATH = ONLINE_DIR / "facts.duckdb"
 REPORTS_DIR = ONLINE_DIR / "reports"
 COPIED_TABLES = ("companies", "company_info", "filings", "financials", "prices")
 MAX_REPORTS = 12  # enough for two companies over all six years; more would slow every other visitor
+# Reports explain a change in other words than a question asks about it: "why did revenue change?" finds
+# nothing, while management writes "decreased, primarily due to lower demand". So these words join the search.
+WHY_QUESTION = re.compile(r"\b(why|reasons?|because|caused?|causes|drove|drive[ns]?|drivers?|explains?|behind)\b",
+                          re.IGNORECASE)
+WHY_WORDS = "decreased increased primarily due lower higher compared"  # no topic words: the question brings those
 
 
 @lru_cache(maxsize=64)
@@ -53,8 +59,8 @@ class OnlineAssistant(Assistant):
 
     def search(self, question: str, filters: Filters, k: int = 8, mode: str = "keyword") -> list[SearchResult]:
         if not filters.tickers:
-            raise SetupError("The online version searches the reports of the companies you name. "
-                             "Try adding one, like: What supply chain risks did Apple describe in 2024?")
+            raise SetupError("Name one of the 99 companies on the market map in your question, for example: "
+                             "What supply chain risks did Apple describe in 2024?")
         years = filters.years or self.report_years
         wanted = [(ticker, year) for ticker in filters.tickers for year in years][:MAX_REPORTS]
         passages = [passage for ticker, year in wanted for passage in load_report(ticker, year)]
@@ -65,7 +71,8 @@ class OnlineAssistant(Assistant):
         index = KeywordIndex.build(table, [passage_text(p.company, p.ticker, p.fiscal_year, p.title, p.text)
                                            for p in passages], min_df=1)
         found = {p.chunk_id: p for p in passages}
-        return [found[chunk_id] for chunk_id, _ in index.search(question, filters, k)]
+        query = f"{question} {WHY_WORDS}" if WHY_QUESTION.search(question) else question
+        return [found[chunk_id] for chunk_id, _ in index.search(query, filters, k)]
 
 
 def main() -> None:
