@@ -19,8 +19,8 @@ import streamlit as st
 from filinglens import llm
 from filinglens.assistant import Assistant, Response, SetupError
 from filinglens.charts import THEMES, growth_label, make_chart
-from filinglens.config import PROJECT_ROOT
-from filinglens.online import ONLINE, OnlineAssistant
+from filinglens.config import DB_PATH, PROJECT_ROOT
+from filinglens.online import FACTS_PATH, ONLINE, OnlineAssistant
 from filinglens.rag.answer import CITATION
 
 EXAMPLES = ["Compare NVIDIA's and AMD's gross margins since 2021",
@@ -119,10 +119,11 @@ def masthead(assistant: Assistant) -> str:
 
 
 @st.cache_resource
-def load() -> tuple[Assistant, threading.Lock, str]:
+def load(data_time: float) -> tuple[Assistant, threading.Lock, str]:
     """One Assistant for all visitors, so the models load once. The lock is there because its database
     connection can only do one thing at a time: other visitors wait their turn. The header and map are
-    built once too; they only change when the data does."""
+    built once too; they only change when the data does. data_time is the data file's time: a deployment
+    updates a running app, and without it new code would meet the old cached Assistant."""
     assistant = OnlineAssistant() if ONLINE else Assistant()
     return assistant, threading.Lock(), masthead(assistant) + tape(assistant), board(assistant)
 
@@ -287,7 +288,7 @@ def main() -> None:
     script = (PROJECT_ROOT / "app.js").read_text(encoding="utf-8")
     st.html(f"<script>{script}</script>", unsafe_allow_javascript=True)
     try:
-        assistant, lock, header, market_map = load()
+        assistant, lock, header, market_map = load((FACTS_PATH if ONLINE else DB_PATH).stat().st_mtime)
     except Exception as exc:  # e.g. the database hasn't been built yet: say so instead of showing a stack trace
         st.error(f"The app couldn't start: {exc}")
         st.stop()
