@@ -67,7 +67,7 @@ The app is a **trading terminal with a lens**, because the name is FilingLens: f
 - A question must name a company, because searching every report at once would need the big index. The app says so.
 - The Research tab's numbers were measured on the full version, and it says so online.
 
-**Why questions needed one more step.** The first live test failed on its own example: asked why Intel's revenue changed, the app said the reports didn't explain it. Keyword search was matching "change" and "why", but reports explain a change in other words, like "decreased, primarily due to". Why questions now search those words too, which took "gave no reason" from common to 0 of 20. Vector search doesn't have this problem, because it matches meaning.
+**Why questions needed one more step.** The first live test failed on its own example: asked why Intel's revenue changed, the app said the reports didn't explain it. Keyword search was matching "change" and "why", but reports explain a change in other words, like "decreased, primarily due to". Why questions now search those words too, and all 20 test questions got a reason, Intel's included. Vector search doesn't have this problem, because it matches meaning.
 
 **A bug the tests caught here.** The keyword index ignored words found in only one passage, sensible across 190,000 passages. Over one report, that word can be exactly what the question asks about, like the insurer GUARD. Online it keeps every word.
 
