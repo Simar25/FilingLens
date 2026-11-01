@@ -1,7 +1,6 @@
 [server]
 headless = true
 enableStaticServing = true  # serves static/, which holds the fonts
-fileWatcherType = "none"  # don't scan every file of PyTorch and transformers for changes
 
 [browser]
 gatherUsageStats = false

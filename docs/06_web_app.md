@@ -60,11 +60,14 @@ The app is a **trading terminal with a lens**, because the name is FilingLens: f
 
 **What changed to fit.** Only the search. `filinglens/online.py` swaps it for keyword search over one compressed file per report, 80 MB for all 594, and a 9 MB copy of the database. For each question it builds a BM25 index over the reports of the companies named in it, so it needs no vector database, no embedding model and no pre-built index. Everything else is the same code: the router, text-to-SQL and its safety checks, the cited answers, the design.
 
-**What that costs.**
+**What that costs, measured on the online version itself:**
 
-- Keyword search found the right passage in the top 5 for 90% of test questions, against 94% for hybrid. It's weakest on paraphrases.
+- The right passage is in the top 5 for 45 of 50 test questions (90%), against 94% for hybrid search.
+- On the 20 "what happened, and why?" questions, every answer gave a reason, and 19 had the expected figure in the strict check. The other showed Merck's $365 million as $0.37 billion. Faithfulness hasn't been graded on this version.
 - A question must name a company, because searching every report at once would need the big index. The app says so.
 - The Research tab's numbers were measured on the full version, and it says so online.
+
+**Why questions needed one more step.** The first live test failed on its own example: asked why Intel's revenue changed, the app said the reports didn't explain it. Keyword search was matching "change" and "why", but reports explain a change in other words, like "decreased, primarily due to". Why questions now search those words too, which took "gave no reason" from common to 0 of 20. Vector search doesn't have this problem, because it matches meaning.
 
 **A bug the tests caught here.** The keyword index ignored words found in only one passage, sensible across 190,000 passages. Over one report, that word can be exactly what the question asks about, like the insurer GUARD. Online it keeps every word.
 
@@ -86,6 +89,8 @@ The app is a **trading terminal with a lens**, because the name is FilingLens: f
 **After that:** apps without visitors go to sleep and wake when someone opens the link. The key is a free one, so it can't run up a bill, but a busy day can use up its daily limit, and visitors then see a message until it resets. The key stays in Streamlit's secrets, not in the code.
 
 **After the data changes:** run `python -m filinglens.online` and commit `online/`.
+
+**If a code change doesn't appear online:** on share.streamlit.io, open the three dots next to the app and choose Reboot.
 
 **Licence note:** `online/facts.duckdb` holds daily prices from Yahoo Finance, which sit in the public repository so that price questions work. If that's ever a concern, remove the `prices` table and price questions will say the data isn't there.
 
