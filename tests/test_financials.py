@@ -133,6 +133,18 @@ def test_falls_back_to_next_tag_when_preferred_is_missing():
     assert tags == {2017: "SalesRevenueNet", 2018: "RevenueFromContractWithCustomerExcludingAssessedTax"}
 
 
+def test_income_statement_total_beats_contract_revenue():
+    # Like American Express: contract revenue leaves out interest income, so it's far below the total.
+    facts = {"facts": {"us-gaap": {
+        "RevenueFromContractWithCustomerExcludingAssessedTax": {"units": {"USD": [
+            fact("2021-01-01", "2021-12-31", 27, "A21", 2021, "2022-02-01")]}},
+        "RevenuesNetOfInterestExpense": {"units": {"USD": [
+            fact("2021-01-01", "2021-12-31", 42, "A21", 2021, "2022-02-01")]}},
+    }}}
+    df, _ = extract_annual_financials(facts, "X")
+    assert metric_by_year(df, "revenue").loc[2021, "value"] == 42
+
+
 def test_net_income_fallback_only_fills_missing_years():
     # Like Caterpillar: "NetIncomeLoss" until 2024, then only "ProfitLoss" (which includes
     # minority interests). The fallback must fill 2025 without replacing 2024.
@@ -152,3 +164,37 @@ def test_net_income_fallback_only_fills_missing_years():
 def test_company_without_data():
     df, year_by_accession = extract_annual_financials({"facts": {}}, "X")
     assert df.empty and year_by_accession == {}
+
+
+def per_share(reports):
+    """Earnings per share as annual reports show it: {year of the report: {year of the period: value}}."""
+    return {"facts": {"us-gaap": {"EarningsPerShareDiluted": {"units": {"USD/shares": [
+        fact(f"{period}-01-01", f"{period}-12-31", value, f"r{year}", year, f"{year + 1}-02-01")
+        for year, values in reports.items() for period, value in values.items()]}}}}}
+
+
+def eps_by_year(reports):
+    df, _ = extract_annual_financials(per_share(reports), "X")
+    return dict(zip(df["fiscal_year"], df["value"]))
+
+
+def test_split_puts_every_year_on_todays_share_basis():
+    eps = eps_by_year({2020: {2020: 10.0}, 2021: {2020: 10.0, 2021: 20.0}, 2022: {2020: 10.0, 2021: 20.0, 2022: 30.0},
+                       2023: {2021: 20.0, 2022: 30.0, 2023: 40.0}, 2024: {2022: 3.0, 2023: 4.0, 2024: 5.0}})
+    assert eps == {2020: 1.0, 2021: 2.0, 2022: 3.0, 2023: 4.0, 2024: 5.0}
+
+
+def test_reverse_split_multiplies_older_years():
+    eps = eps_by_year({2019: {2019: 0.5}, 2020: {2019: 0.5, 2020: 1.0}, 2021: {2019: 0.5, 2020: 1.0, 2021: 2.0},
+                       2022: {2020: 8.0, 2021: 16.0, 2022: 24.0}})
+    assert eps == {2019: 4.0, 2020: 8.0, 2021: 16.0, 2022: 24.0}
+
+
+def test_a_single_restated_year_is_not_a_split():
+    eps = eps_by_year({2021: {2021: 4.0}, 2022: {2021: 4.0, 2022: 6.0}, 2023: {2021: 2.0, 2022: 6.0, 2023: 7.0}})
+    assert eps == {2021: 2.0, 2022: 6.0, 2023: 7.0}
+
+
+def test_two_years_restated_by_different_amounts_are_not_a_split():
+    eps = eps_by_year({2021: {2021: 0.26}, 2022: {2021: 0.26, 2022: 0.17}, 2023: {2021: 0.46, 2022: 0.49, 2023: 1.0}})
+    assert eps == {2021: 0.46, 2022: 0.49, 2023: 1.0}

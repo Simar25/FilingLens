@@ -1,8 +1,10 @@
 import zipfile
+from datetime import date
 
 import pandas as pd
 import requests
 
+from filinglens.india.ingest import filing_date, fix_characters, page_chunks
 from filinglens.india.nse import NseClient, choose_reports, is_complete, unzip_pdfs
 from filinglens.india.report_text import clean, section_from_bookmarks, section_from_headings
 
@@ -186,3 +188,24 @@ def test_an_incomplete_file_is_retried_then_reported_not_retried_forever(tmp_pat
     except IOError as exc:
         assert "still incomplete" in str(exc)
     assert len(calls) == 8 and calls[1] == f"bytes={len(partial)}-"
+
+
+def test_each_passage_keeps_its_page_and_covers_are_skipped():
+    words = " ".join(["revenue"] * 60)
+    chunks = page_chunks(["Annual Report 2025", words, f"{words} rose"], "NSE-X-2025", "X", 2025)
+    assert [(c["chunk_id"], c["item"], c["title"]) for c in chunks] == [("X-2025-NSE-00000", "NSE", "page 2"),
+                                                                        ("X-2025-NSE-00001", "NSE", "page 3")]
+
+
+def test_filing_date_comes_from_the_file_name():
+    assert filing_date("https://x/AR_24850_RELIANCE_2023_2024_07082024143222.pdf", 2024) == date(2024, 8, 7)
+    assert filing_date("https://x/AR_29285_RELIANCE_2025_2026_A_11007429_28052026133947.pdf", 2026) == date(2026, 5, 28)
+    assert filing_date("https://x/report.pdf", 2025) == date(2025, 3, 31)
+
+
+def test_rupee_signs_and_bullets_drawn_by_special_fonts_are_restored():
+    assert fix_characters("receivables of `35,234 crore") == "receivables of ₹35,234 crore"
+    assert fix_characters("at ¢ 3,99,526 crore") == "at ₹ 3,99,526 crore"
+    assert fix_characters("E847,201 Mn Revenue") == "₹847,201 Mn Revenue"
+    assert fix_characters("\tà 2300-bed hospital\n\x83 solar") == "• 2300-bed hospital\n• solar"
+    assert fix_characters("E10 is a fuel, and a café costs ¢ none") == "E10 is a fuel, and a café costs ¢ none"

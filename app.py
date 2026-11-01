@@ -25,10 +25,11 @@ from filinglens.rag.answer import CITATION
 
 EXAMPLES = ["Compare NVIDIA's and AMD's gross margins since 2021",
             "What supply chain risks did Apple describe in 2024?",
-            "How did Intel's revenue change in fiscal 2023, and why?"]
-# Label -> (SQL expression, chart unit). Earnings per share is left out on purpose: for companies that
-# split their stock, the database mixes pre-split and post-split years (docs/06_web_app.md).
+            "How did Intel's revenue change in fiscal 2023, and why?",
+            "What risks did Infosys describe in fiscal 2025?"]
+# Label -> (SQL expression, chart unit).
 METRICS = {"Revenue": ("revenue / 1e9", "bn"), "Net income": ("net_income / 1e9", "bn"),
+           "Earnings per share": ("eps_diluted", "usd"),
            "Operating income": ("operating_income / 1e9", "bn"), "Free cash flow": ("free_cash_flow / 1e9", "bn"),
            "R&D expense": ("rnd_expense / 1e9", "bn"), "Gross margin": ("gross_margin * 100", "pct"),
            "Operating margin": ("operating_margin * 100", "pct"), "Net margin": ("net_margin * 100", "pct"),
@@ -45,7 +46,8 @@ MEASURED = pd.DataFrame(
 SECTOR_NAMES = {"Communication Services": "MEDIA", "Consumer Cyclical": "RETAIL", "Consumer Defensive": "STAPLES",
                 "Financial Services": "FINANCE", "Basic Materials": "MATERIALS", "Technology": "TECH",
                 "Healthcare": "HEALTH", "Industrials": "INDUSTRY", "Real Estate": "PROPERTY", "Energy": "ENERGY",
-                "Utilities": "UTILITIES"}
+                "Utilities": "UTILITIES", "India": "INDIA"}
+UNITS = {"bn": "US$ billions.", "pct": "Percent.", "usd": "US$ per share, adjusted for stock splits so years compare."}
 GROWTH_BANDS = [(0.20, "up3", "Grew 20% or more"), (0.08, "up2", "Grew 8 to 20%"), (0.0, "up1", "Grew up to 8%"),
                 (-0.08, "down1", "Fell up to 8%")]
 RESEARCH_CHARTS = [("04_change_by_year.png", "Companies barely rewrite their reports: about 1% of Risk Factors a year."),
@@ -55,7 +57,7 @@ RESEARCH_CHARTS = [("04_change_by_year.png", "Companies barely rewrite their rep
 def growth_band(growth: float | None) -> tuple[str, str]:
     """(CSS class, legend label) of a revenue growth rate. Whole bands, as on a printed map, not a smooth scale."""
     if growth is None or pd.isna(growth):
-        return "none", "Not reported"
+        return "none", "No figure (reports only, or not reported)"
     for floor, name, label in GROWTH_BANDS:
         if growth >= floor:
             return name, label
@@ -63,14 +65,14 @@ def growth_band(growth: float | None) -> tuple[str, str]:
 
 
 def board(assistant: Assistant) -> str:
-    """All the companies at a glance, by sector: 99 squares, each a link that starts a question about that company.
+    """All the companies at a glance, by sector, with India last: each square is a link that starts a question about that company.
     Built from database values only, and names are escaped, so it's safe to show as HTML."""
     rows = assistant.con.execute("""
         SELECT i.sector, i.ticker, w.revenue_growth
         FROM company_info i
         LEFT JOIN financials_wide w ON w.ticker = i.ticker
             AND w.fiscal_year = (SELECT MAX(fiscal_year) FROM financials_wide)
-        ORDER BY i.sector, i.market_cap DESC NULLS LAST, i.ticker
+        ORDER BY i.sector = 'India', i.sector, i.market_cap DESC NULLS LAST, i.ticker
     """).df()
     columns = []
     for sector, companies in rows.groupby("sector", sort=False):
@@ -103,6 +105,7 @@ def tape(assistant: Assistant) -> str:
     """).fetchall()
     items = []
     for ticker, close, change in rows:
+        change = None if change is None else round(change, 3) + 0.0  # adding 0.0 turns -0.0 into 0.0
         move = "" if change is None else f' <i class="{"rise" if change >= 0 else "fall"}">{change:+.1%}</i>'
         items.append(f"<span><b>{html.escape(ticker)}</b> {close:,.2f}{move}</span>")
     return f'<div class="tape" aria-label="Latest closing prices"><div>{"".join(items) * 2}</div></div>'
@@ -126,7 +129,8 @@ def load() -> tuple[Assistant, threading.Lock, str]:
 
 def company_labels(assistant: Assistant) -> dict[str, str]:
     """'Apple Inc. (AAPL)' -> 'AAPL'. SEC names can end in a state, like 'AMERICAN TOWER CORP /MA/'."""
-    return {f"{name.split(' /')[0]} ({ticker})": ticker for ticker, name in sorted(assistant.companies.items())}
+    return {f"{name.split(' /')[0]} ({ticker})": ticker for ticker, name in sorted(assistant.companies.items())
+            if ticker not in assistant.reports_only}
 
 
 def plain(text: str) -> str:
@@ -255,7 +259,7 @@ def explore_tab(assistant: Assistant, lock: threading.Lock) -> None:
         return
     show_chart(chart, "explore")
     st.table(ledger(table.pivot(index="ticker", columns="fiscal_year", values=column)))
-    st.caption("US$ billions." if unit == "bn" else "Percent.")
+    st.caption(UNITS[unit])
 
 
 def research_tab() -> None:
@@ -292,6 +296,9 @@ def main() -> None:
                                               "growth in the latest fiscal year",
                                               expanded="response" not in st.session_state):
         st.markdown(market_map, unsafe_allow_html=True)
+        st.caption("Why these? The nine largest US companies in each of 11 sectors with six years of reports, plus 10 large "
+                   "Indian companies, searched by report only. Every score here was measured on the US ones, and they fit a "
+                   "free host. The README explains what covering every company would take.")
     ask, explore, research = st.tabs(["F1 ASK", "F2 EXPLORE", "F3 RESEARCH"])
     with ask:
         ask_tab(assistant, lock)

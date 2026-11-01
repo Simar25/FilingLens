@@ -24,7 +24,7 @@
 The app is a **trading terminal with a lens**, because the name is FilingLens: filings are what it reads, and a lens is what it does.
 
 - **The terminal.** Black screen, amber labels, one monospaced font, green and red for up and down, and a tape of real closing prices across the top. It says "finance" before you read a word, and it packs a lot of data onto one screen, which is how analysts like to work.
-- **The market map.** Your 99 companies turned out to be 11 sectors of exactly 9 each, which makes a perfect grid. Each square is coloured by revenue growth in the latest fiscal year, with the figure printed in it, so colour isn't the only signal (red and green are hard to tell apart for some people). It answers "which companies can I ask about?" without a list. Clicking a square starts a question about that company. It folds away once you've asked something, so the answer stays near the top.
+- **The market map.** Your 99 US companies turned out to be 11 sectors of exactly 9 each, which makes a perfect grid, and the 10 Indian companies form a twelfth column. Each square is coloured by revenue growth in the latest fiscal year, with the figure printed in it, so colour isn't the only signal (red and green are hard to tell apart for some people). It answers "which companies can I ask about?" without a list. Clicking a square starts a question about that company. It folds away once you've asked something, so the answer stays near the top.
 - **The lens.** Move the mouse over the map and a magnifying lens enlarges what's under it. This is the one memorable thing, and it's the name of the product made literal. `app.js` copies the map into a circle and scales the copy. Clicks pass straight through it.
 - **The viewfinder.** An answer is framed with camera corners, and its question is labelled IN FOCUS.
 - **Ticks.** `[DB]` and `[1]` become ticks (✓ DB, ✓ 1), and TRACED TO in the margin lists what each one points to. Auditors tick a figure once they have traced it to a source, and that's what citations do.
@@ -39,7 +39,7 @@ The app is a **trading terminal with a lens**, because the name is FilingLens: f
 
 **One Assistant for everyone.** Loading the models takes seconds, so the app loads them once (`st.cache_resource`) and all visitors share them. The database connection can only do one thing at a time, so a lock makes visitors take turns. That's fine for a demo and wouldn't be for thousands of users.
 
-**Earnings per share isn't in Explore.** The data has a real problem here (see below), and a chart would draw it as a crash that never happened.
+**Explore leaves out the Indian companies.** It charts database figures, and they have none (`docs/04b_india_pilot.md` says why).
 
 **Dollars and tildes in answers.** Streamlit's Markdown treats `$...$` as a maths formula and `~...~` as a strikethrough, so "$54 billion to $60 billion" would come out as garbled maths. The app escapes both before showing any answer or report text.
 
@@ -58,7 +58,7 @@ The app is a **trading terminal with a lens**, because the name is FilingLens: f
 
 **Why not the full version?** The full app needs the embedding model, PyTorch and 4.8 GB of data. Hugging Face was the original plan, but [its docs](https://huggingface.co/docs/hub/en/spaces-overview) now say Docker Spaces need a paid plan ([$9 a month](https://huggingface.co/pricing)). [Streamlit Community Cloud](https://docs.streamlit.io/deploy/streamlit-community-cloud) is free and runs Streamlit apps straight from a GitHub repository, but with up to 2.7 GB of memory.
 
-**What changed to fit.** Only the search. `filinglens/online.py` swaps it for keyword search over one compressed file per report, 80 MB for all 594, and a 9 MB copy of the database. For each question it builds a BM25 index over the reports of the companies named in it, so it needs no vector database, no embedding model and no pre-built index. Everything else is the same code: the router, text-to-SQL and its safety checks, the cited answers, the design.
+**What changed to fit.** Only the search. `filinglens/online.py` swaps it for keyword search over one compressed file per report, 99 MB for all 634, and a 9 MB copy of the database. For each question it builds a BM25 index over the reports of the companies named in it, so it needs no vector database, no embedding model and no pre-built index. Everything else is the same code: the router, text-to-SQL and its safety checks, the cited answers, the design.
 
 **What that costs, measured on the online version itself:**
 
@@ -96,7 +96,7 @@ The app is a **trading terminal with a lens**, because the name is FilingLens: f
 
 ## The data bug found along the way
 
-Earnings per share is wrong across stock splits. The pipeline keeps the most recently filed value for each year, and after a split the newest filings restate some years but not others. Netflix goes from 9.95 in fiscal 2022 to 1.20 in fiscal 2023, which looks like a collapse but is a 10-for-1 split. The same pattern shows up for NVIDIA, Broadcom, Walmart and others. The fix belongs in Step 1: restate every year on one share basis. Until then Explore leaves the figure out, but the Ask tab can still return it, and a question about EPS across a split year would be wrong.
+Earnings per share was wrong across stock splits: Netflix seemed to fall from 9.95 in fiscal 2022 to 1.20 in fiscal 2023, when it had really split its stock 10-for-1. The chart kept it out of Explore at first. It's now fixed where it began, in Step 1 (`docs/01_data_pipeline.md`, Trap 4), and the figure is back in Explore.
 
 ## Interview questions
 

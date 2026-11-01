@@ -44,7 +44,7 @@ def test_no_year_means_all_of_the_companys_reports(assistant):
 
 
 def test_a_question_naming_no_company_gets_a_clear_message(assistant):
-    with pytest.raises(SetupError, match="99 companies on the market map"):
+    with pytest.raises(SetupError, match="companies on the market map"):
         assistant.search("What are the biggest risks?", Filters())
 
 

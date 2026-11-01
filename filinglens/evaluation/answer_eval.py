@@ -30,29 +30,23 @@ import time
 import pandas as pd
 
 from filinglens.assistant import Assistant
+from filinglens.combine import find_numbers
 from filinglens.evaluation.draft_questions import EVAL_DIR, QUESTIONS_PATH
 from filinglens.llm import LLMError, current_settings
-from filinglens.rag.answer import CITATION
 from filinglens.router import route_question
 
 ANSWER_QUESTIONS_PATH = EVAL_DIR / "answer_questions.jsonl"
 RESULTS_PATH = EVAL_DIR / "answer_results.jsonl"
+# Written after the fixes of docs/05 part 3, and never used to tune anything, so these keep the score honest.
+FRESH_QUESTIONS_PATH = EVAL_DIR / "fresh_questions.jsonl"
+FRESH_RESULTS_PATH = EVAL_DIR / "fresh_results.jsonl"
 FULL_TEXT_ANSWERS = 20         # text questions answered in full; the rest only go through the router
 TOKENS_PER_MINUTE = 8000       # Groq's free tier: the pause after each question stays under this
 PRICE_PER_MILLION = 0.15, 0.60  # USD, input and output: Groq's list price for gpt-oss-120b on 2026-10-31
 
-# 394.33, 1,234, 12.5%, $3 billion. Not the 2024 in FY2024, nor the 10 in 10-K.
-NUMBER = re.compile(r"(?<![\w.])(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?(?!-[A-Za-z])\s*(%|percent|trillion|billion|bn|million)?",
-                    re.IGNORECASE)
 SCALES = {"trillion": 1e12, "billion": 1e9, "bn": 1e9, "million": 1e6, "%": 1, "percent": 1}
 ANY_SCALE = (1, 1e3, 1e6, 1e9)  # a bare number, e.g. in a table under the heading "USD bn", can be in any unit
 MAX_ROUNDING = 0.01             # "$9 billion" may stand for 8.97, but a stray "1" must not stand for 1.2
-
-
-def find_numbers(text: str) -> list[tuple[float, int, str]]:
-    """Every number in the text, without [n] citations: (value, decimals shown, unit word)."""
-    return [(float(digits.replace(",", "") + fraction), len(fraction) - 1 if fraction else 0, unit.lower())
-            for digits, fraction, unit in NUMBER.findall(CITATION.sub(" ", text))]
 
 
 def states(gold: float, numbers: list[tuple[float, int, str]]) -> bool:
@@ -95,6 +89,11 @@ def score(row: dict, names: list[list[str]]) -> dict:
     return row | {"sql_right": has_everything(table, row["gold"], []),  # tables have tickers, not names
                   "answer_right": has_everything(row["text"], row["gold"], names),
                   "extra_figures": figures_not_in_table(row["text"], table) if table else []}
+
+
+def tagged(path, tag: str):
+    """answer_results.jsonl -> answer_results_ollama.jsonl: a run on another model never mixes with this one."""
+    return path.with_stem(f"{path.stem}_{tag}") if tag else path
 
 
 def price(calls: list[dict]) -> float:
@@ -152,7 +151,8 @@ def run(questions: list[dict]) -> None:
             right = score(row, q.get("names", []))["answer_right"] if "gold" in row else ""
             print(f"{q['id']} {row['route']:<8} {right} {q['question'][:70]}", flush=True)
             tokens = sum(c["in"] + c["out"] for c in row["calls"])
-            time.sleep(max(0.0, tokens / TOKENS_PER_MINUTE * 60 - (time.perf_counter() - start)))
+            if current_settings()[0] != "ollama":  # a local model has no rate limit to stay under
+                time.sleep(max(0.0, tokens / TOKENS_PER_MINUTE * 60 - (time.perf_counter() - start)))
 
 
 def summarize(rows: list[dict]) -> None:
@@ -193,10 +193,17 @@ def summarize(rows: list[dict]) -> None:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Measure the app's answers on the test questions.")
     parser.add_argument("--summary", action="store_true", help="Only summarize the saved results")
+    parser.add_argument("--fresh", action="store_true", help="Use the questions the fixes never saw")
+    parser.add_argument("--tag", default="", help="Keep this run's results in their own file, e.g. --tag ollama")
     args = parser.parse_args(argv)
     sys.stdout.reconfigure(errors="replace")
-    numbers = [json.loads(line) for line in ANSWER_QUESTIONS_PATH.read_text(encoding="utf-8").splitlines() if line]
-    text = [json.loads(line) for line in QUESTIONS_PATH.read_text(encoding="utf-8").splitlines() if line]
+    global RESULTS_PATH
+    if args.fresh:
+        RESULTS_PATH = FRESH_RESULTS_PATH
+    RESULTS_PATH = tagged(RESULTS_PATH, args.tag)
+    numbers_path = FRESH_QUESTIONS_PATH if args.fresh else ANSWER_QUESTIONS_PATH
+    numbers = [json.loads(line) for line in numbers_path.read_text(encoding="utf-8").splitlines() if line]
+    text = [] if args.fresh else [json.loads(line) for line in QUESTIONS_PATH.read_text(encoding="utf-8").splitlines() if line]
     for q in text[FULL_TEXT_ANSWERS:]:
         q["route_only"] = True
     if not args.summary:

@@ -26,7 +26,7 @@ ROUTES = ("numbers", "text", "both")
 FALLBACK_ROUTE = "both"
 
 SYSTEM_PROMPT = """\
-You route questions about US public companies to the right source of information.
+You route questions about public companies to the right source of information.
 
 - "numbers": the answer is figures from a database of reported financial statements and stock prices. It has, per \
 company and fiscal year: revenue, cost of revenue, gross profit, R&D expense, operating income, net income, diluted \

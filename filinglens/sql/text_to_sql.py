@@ -48,6 +48,10 @@ period), so every result can be checked and a missing input is visible instead o
 - For a value at the start or end of a period, pick that year's value \
 (MAX(CASE WHEN fiscal_year = 2022 THEN revenue END)), never MIN(revenue) or MAX(revenue): the smallest value is \
 not the first year's value when revenue fell.
+- A WHERE runs before LAG, so LAG can't see a year the filter removed. For revenue growth use the ready-made column: \
+ROUND(revenue_growth * 100, 1) AS revenue_growth_pct. For another year-on-year change, select both years and pick each \
+with MAX(CASE WHEN fiscal_year = ... END).
+- For a total across rows, add a column (SUM(net_income) OVER () / 1e9 AS total_bn), never an extra row with UNION.
 - Include ticker and fiscal_year (or date) columns so every number can be identified.
 - For several companies or years, return one row per company and year, ordered by ticker, then year. This layout \
 can be drawn as a chart.
@@ -76,6 +80,13 @@ FROM financials_wide
 WHERE fiscal_year = 2024 AND net_margin IS NOT NULL
 ORDER BY net_margin DESC
 LIMIT 5
+```
+
+Question: By what percentage did Netflix's revenue rise in fiscal 2023?
+```sql
+SELECT ticker, fiscal_year, ROUND(revenue / 1e9, 2) AS revenue_bn, ROUND(revenue_growth * 100, 1) AS revenue_growth_pct
+FROM financials_wide
+WHERE ticker = 'NFLX' AND fiscal_year = 2023
 ```
 
 Question: Did Tesla's stock beat the market in 2024?
@@ -113,8 +124,9 @@ CANNOT_ANSWER = re.compile(r"CANNOT_ANSWER:?\s*(.*)", re.IGNORECASE)
 MAX_ERROR_CHARS = 600  # DuckDB errors can include long candidate lists; the first part is what matters
 # An empty result is usually a filter mistake (a year that isn't in the data yet, a misspelled ticker), so it
 # gets the retry too. Seen on 2026-10-19: "growth from 2022 to 2026" asked for fiscal 2026 and got nothing.
-NO_DATA = ("It ran, but returned no data (no rows, or only empty values). Check its filters against the data "
-           "available (tickers, fiscal years). If no data really is the answer, reply with the same query.")
+NO_DATA = ("It ran, but returned no data (no rows, or a column with only empty values). Check its filters against the "
+           "data available (tickers, fiscal years). A WHERE runs before LAG, so LAG can't see a year the filter removed. "
+           "If no data really is the answer, reply with the same query.")
 LABEL_COLUMNS = {"ticker", "company", "name", "fiscal_year", "year", "date", "month"}
 
 
@@ -174,11 +186,16 @@ def text_to_sql(question: str, schema: str, con: duckdb.DuckDBPyConnection,
             continue
         # Keep every query that ran: if the retry fails, an empty result still beats none.
         result.sql, result.table, result.truncated = checked, table, truncated
-        if has_data(table):
+        if has_data(table) and not has_empty_column(table):
             return result
         result.errors.append(NO_DATA)
         prompt = RETRY_PROMPT.format(question=question, sql=checked, error=NO_DATA)
     return result
+
+
+def has_empty_column(table: pd.DataFrame) -> bool:
+    """True if a column has no values at all: a calculation that failed, like LAG after a WHERE, not a missing figure."""
+    return bool(table.isna().all().any())
 
 
 def has_data(table: pd.DataFrame) -> bool:

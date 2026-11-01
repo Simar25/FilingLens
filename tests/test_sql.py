@@ -4,8 +4,8 @@ import pytest
 from filinglens import database
 from filinglens.assistant import NO_DATA_ANSWER, Assistant, SetupError
 from filinglens.charts import make_chart, save_chart
-from filinglens.combine import build_prompt
-from filinglens.llm import LLMReply
+from filinglens.combine import build_prompt, unsourced_figures, write_answer
+from filinglens.llm import LLMError, LLMReply
 from filinglens.rag.vector_store import SearchResult
 from filinglens.router import parse_route, route_question
 from filinglens.sql.safety import QueryError, UnsafeQueryError, check_sql, connect_readonly, run_query
@@ -291,7 +291,7 @@ def test_both_route_combines_sql_and_passages(db_path):
     passage = SearchResult("NVDA-2023-7-0001", "NVDA", "NVIDIA CORP", 2023, "7", "MD&A", "Data center grew.", 0.7)
     llm = scripted_llm(
         "```sql\nSELECT ticker, fiscal_year, revenue FROM financials_wide WHERE ticker = 'NVDA'\n```",
-        "Revenue reached 27e9 [DB], driven by data center demand [1].",
+        "Revenue rose [DB], driven by data center demand [1].",
     )
     with Assistant(db_path, generate=llm) as assistant:
         assistant.search = lambda question, filters, k, mode: [passage]  # no embedding model or vector DB in tests
@@ -330,3 +330,84 @@ def test_without_a_search_index_the_database_reason_is_kept(db_path):
     with NoIndex(db_path, scripted_llm(ROUTED_TO_NUMBERS, "CANNOT_ANSWER: no segment data")) as assistant:
         response = assistant.ask("What was NVIDIA's segment revenue in 2023?")
     assert response.text == "The database can't answer this: no segment data" and not response.read_reports_instead
+
+
+def answer_reply(text):
+    return LLMReply(text=text, model="fake", input_tokens=1, output_tokens=1, seconds=0.0)
+
+
+def figures_result():
+    return SqlResult("q", table=pd.DataFrame({"ticker": ["INTC"], "rnd_expense_bn": [16.05]}))
+
+
+def test_a_rounded_figure_gets_one_rewrite():
+    replies = iter([answer_reply("Intel spent $16.1 billion [DB]."), answer_reply("Intel spent $16.05 billion [DB].")])
+    answer, calls = write_answer("How much?", figures_result(), [], lambda system, user: next(replies))
+    assert answer.text == "Intel spent $16.05 billion [DB]." and len(calls) == 2
+
+
+def test_a_copied_figure_costs_no_second_call():
+    answer, calls = write_answer("How much in 2023?", figures_result(), [],
+                                 lambda system, user: answer_reply("In 2023 Intel spent $16.05 billion [DB]."))
+    assert len(calls) == 1 and "16.05" in answer.text
+
+
+def test_a_rewrite_that_is_no_better_is_dropped():
+    replies = iter([answer_reply("About $16.1 billion [DB]."), answer_reply("About $16.2 billion [DB].")])
+    answer, calls = write_answer("How much?", figures_result(), [], lambda system, user: next(replies))
+    assert answer.text == "About $16.1 billion [DB]." and len(calls) == 2
+
+
+def test_the_first_answer_survives_a_failed_rewrite():
+    replies = iter([answer_reply("About $16.1 billion [DB].")])
+
+    def generate(system, user):
+        try:
+            return next(replies)
+        except StopIteration:
+            raise LLMError("quota") from None
+
+    answer, calls = write_answer("How much?", figures_result(), [], generate)
+    assert answer.text == "About $16.1 billion [DB]." and len(calls) == 1
+
+
+def test_list_numbers_years_and_csv_commas_are_not_flagged():
+    data = "date,close\n2024-12-31,248.62\nrevenue was $119,196 million"
+    assert unsourced_figures("1. On December 31, 2024 it closed at 248.62, on $119,196 million [DB].", data) == []
+    assert unsourced_figures("It rose 39.6 points.", data) == [39.6]
+
+
+def test_a_company_with_reports_only_goes_straight_to_its_reports(db_path):
+    con = database.connect(db_path)
+    database.replace_rows(con, "companies", pd.DataFrame({"ticker": ["INFY"], "cik": [0], "name": ["Infosys"]}))
+    database.replace_rows(con, "filings", pd.DataFrame(
+        {"accession_number": ["NSE-INFY-2025"], "ticker": ["INFY"], "fiscal_year": [2025], "form": ["AR"],
+         "filing_date": ["2025-06-02"], "document_url": ["https://x"]}))
+    con.close()
+    generate = scripted_llm(ROUTED_TO_NUMBERS, "Revenue rose [1].")
+    with WithReports(db_path, generate) as assistant:
+        response = assistant.ask("What was Infosys's revenue in 2025?")
+    assert response.sql is None and response.text == "Revenue rose [1]."
+    assert response.route.route == "numbers"  # the router's own choice stays on record
+
+
+def test_sql_that_cannot_even_be_tokenized_is_refused_not_a_crash():
+    with pytest.raises(UnsafeQueryError, match="could not be parsed"):
+        check_sql("SELECT 'never closed FROM financials_wide")
+
+
+def test_a_column_with_no_values_gets_the_retry(db_path):
+    con = connect_readonly(db_path)
+    generate = scripted_llm(
+        "```sql\nSELECT ticker, NULL AS revenue_growth_pct FROM financials_wide WHERE ticker = 'NVDA'\n```",
+        "```sql\nSELECT ticker, revenue_growth AS revenue_growth_pct FROM financials_wide WHERE ticker = 'NVDA' AND fiscal_year = 2024\n```")
+    result = text_to_sql("How fast did NVIDIA grow?", describe_schema(con), con, generate)
+    con.close()
+    assert result.attempts == 2 and "A WHERE runs before LAG" in generate.calls[1][1]
+
+
+def test_two_columns_with_one_name_get_the_retry_not_a_crash(db_path):
+    con = connect_readonly(db_path)
+    with pytest.raises(QueryError, match="same name"):
+        run_query(con, "SELECT 1 AS revenue_bn, 2 AS revenue_bn")
+    con.close()

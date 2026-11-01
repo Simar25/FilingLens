@@ -8,7 +8,7 @@ from filinglens.rag.answer import NO_SOURCES_ANSWER, answer_question, build_prom
 from filinglens.rag.embeddings import passage_text
 from filinglens.evaluation.draft_questions import parse_draft
 from filinglens.evaluation.search_eval import first_rank, summarize
-from filinglens.rag.filters import Filters, detect_filters
+from filinglens.rag.filters import Filters, detect_companies, detect_filters, detect_years
 from filinglens.rag.keyword_search import KeywordIndex, reciprocal_rank_fusion
 from filinglens.rag.vector_store import SearchResult, VectorStore, build_where
 
@@ -357,3 +357,21 @@ def test_parse_draft_reads_json_and_skips():
                                                                                  "answer": "Because {x}."}
     assert parse_draft("SKIP") is None
     assert parse_draft('{"question": "Why?"}') is None
+
+
+def test_indian_year_notation_names_the_year_it_ended():
+    assert detect_years("Infosys in 2024-25", []) == [2025]
+    assert detect_years("Infosys in FY2025-26", []) == detect_years("Infosys in FY25-26", []) == [2026]
+    assert detect_years("Apple from 2021-2023", []) == [2021, 2022, 2023]
+
+
+def test_indian_companies_are_found_by_their_usual_names():
+    companies = {"DRREDDY": "Dr. Reddy's Laboratories", "LT": "Larsen & Toubro", "BHARTIARTL": "Bharti Airtel",
+                 "HDFCBANK": "HDFC Bank", "HINDUNILVR": "Hindustan Unilever"}
+    assert detect_companies("risks at Dr Reddy's and L&T", companies) == ["DRREDDY", "LT"]
+    assert detect_companies("Airtel, HDFC Bank and HUL", companies) == ["BHARTIARTL", "HDFCBANK", "HINDUNILVR"]
+
+
+def test_an_indian_passage_is_labelled_with_its_page():
+    passage = SearchResult("INFY-2025-NSE-00001", "INFY", "Infosys", 2025, "NSE", "page 12", "text", 1.0)
+    assert passage.label == "INFY annual report FY2025, page 12"

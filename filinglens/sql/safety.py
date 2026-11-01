@@ -65,7 +65,7 @@ def check_sql(sql: str) -> str:
     """Return the query re-written from its checked tree, or raise UnsafeQueryError."""
     try:
         statements = [s for s in sqlglot.parse(sql, read="duckdb") if s is not None]
-    except sqlglot.errors.ParseError as exc:
+    except sqlglot.errors.SqlglotError as exc:  # ParseError, and TokenError for text it can't even split into words
         raise UnsafeQueryError(f"The SQL could not be parsed: {str(exc).splitlines()[0]}") from None
     if len(statements) != 1:
         raise UnsafeQueryError(f"Expected exactly one statement, got {len(statements)}.")
@@ -120,6 +120,8 @@ def run_query(con: duckdb.DuckDBPyConnection, sql: str,
         raise QueryError(str(exc)) from None
     finally:
         timer.cancel()
+    if len(set(columns)) < len(columns):  # pandas can't tell them apart, and neither could a reader of the table
+        raise QueryError(f"Two result columns have the same name ({', '.join(columns)}). Give each its own alias.")
     table = pd.DataFrame.from_records(rows[:max_rows], columns=columns)
     for column in table.columns:
         # DECIMAL values (e.g. from ROUND on a whole number) arrive as Python Decimals, which pandas

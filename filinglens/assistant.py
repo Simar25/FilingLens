@@ -68,6 +68,9 @@ class Assistant:
         self.companies = dict(self.con.execute("SELECT ticker, name FROM companies").fetchall())
         self.report_years = [y for (y,) in self.con.execute("SELECT DISTINCT fiscal_year FROM chunks ORDER BY 1")
                              .fetchall()]
+        # Reports only: the Indian companies have no figures in the database (india/ingest.py says why).
+        self.reports_only = {t for (t,) in self.con.execute("SELECT DISTINCT ticker FROM filings WHERE form = 'AR'")
+                             .fetchall()}
         self.schema = describe_schema(self.con)
         self._embedder = None
         self._store = None
@@ -146,6 +149,9 @@ class Assistant:
         response = Response(question, decision, calls=[("router", decision.reply)] if decision.reply else [])
 
         path = decision.route  # response.route keeps the router's own choice, so its accuracy can be measured
+        named = set(self.filters_for(question, tickers).tickers)
+        if not route and named and named <= self.reports_only:
+            path = "text"  # their figures are in the reports, so the database would only find nothing
         if path in ("numbers", "both"):
             response.sql = text_to_sql(question, self.schema, self.con, self.generate)
             response.calls += [("SQL" if i == 0 else "SQL retry", r) for i, r in enumerate(response.sql.replies)]
@@ -187,8 +193,8 @@ class Assistant:
             else:
                 response.text = NO_DATA_ANSWER
             return
-        reply = write_answer(response.question, sql, response.sources, self.generate)
-        response.calls.append(("answer", reply))
+        reply, replies = write_answer(response.question, sql, response.sources, self.generate)
+        response.calls += [("answer" if i == 0 else "answer rewrite", r) for i, r in enumerate(replies)]
         response.text = reply.text
         response.cites_db = DB_CITATION in reply.text
         numbers = find_citations(reply.text)

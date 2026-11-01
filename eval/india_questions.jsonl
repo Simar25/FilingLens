@@ -1,0 +1,10 @@
+{"id": "i01", "ticker": "BHARTIARTL", "fiscal_year": 2023, "page": 179, "question": "How does Bharti Airtel treat government grants relating to property, plant and equipment in fiscal 2023?", "expect": ["deferred income"]}
+{"id": "i02", "ticker": "DRREDDY", "fiscal_year": 2026, "page": 144, "question": "On what date did Dr. Reddy's board approve the standalone financial statements for fiscal 2026?", "expect": ["12 may 2026", "may 12, 2026"]}
+{"id": "i03", "ticker": "HDFCBANK", "fiscal_year": 2026, "page": 455, "question": "What does the Malus arrangement in HDFC Bank's fiscal 2026 report do?", "expect": ["cancel"]}
+{"id": "i04", "ticker": "HINDUNILVR", "fiscal_year": 2024, "page": 123, "question": "What does Hindustan Unilever say about commodity price risk in fiscal 2024?", "expect": ["raw material"]}
+{"id": "i05", "ticker": "ICICIBANK", "fiscal_year": 2026, "page": 217, "question": "According to ICICI Bank's fiscal 2026 report, at what level did the MPC keep the policy repo rate in its April 2026 review?", "expect": ["5.25"]}
+{"id": "i06", "ticker": "INFY", "fiscal_year": 2026, "page": 319, "question": "What were Infosys's trade receivables at March 31, 2026?", "expect": ["35,234"]}
+{"id": "i07", "ticker": "LT", "fiscal_year": 2023, "page": 7, "question": "In L&T's fiscal 2023 report, what does the CEO say the organisation is driven to become?", "expect": ["asset-light", "asset light"]}
+{"id": "i08", "ticker": "RELIANCE", "fiscal_year": 2026, "page": 49, "question": "How much data traffic did Jio carry in FY 2025-26, according to Reliance's annual report?", "expect": ["241"]}
+{"id": "i09", "ticker": "TCS", "fiscal_year": 2024, "page": 75, "question": "What was TCS's IT services attrition rate in fiscal 2024?", "expect": ["12.5"]}
+{"id": "i10", "ticker": "WIPRO", "fiscal_year": 2023, "page": 340, "question": "What critical audit matter did Wipro's auditor describe about revenue in fiscal 2023?", "expect": ["fixed-price", "fixed price"]}

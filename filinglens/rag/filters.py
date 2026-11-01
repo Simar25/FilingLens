@@ -26,7 +26,8 @@ NICKNAMES = {
     "john deere": "DE", "southern company": "SO", "air products": "APD", "equity residential": "VMRK",
     "live nation": "LYV", "johnson & johnson": "JNJ", "digital realty": "DLR", "martin marietta": "MLM",
     "enterprise products": "EPD", "johnson and johnson": "JNJ", "jnj": "JNJ", "att": "T", "amd": "AMD",
-    "pepsi": "PEP",
+    "pepsi": "PEP", "dr reddy": "DRREDDY", "dr. reddy": "DRREDDY", "hul": "HINDUNILVR", "l&t": "LT",
+    "larsen and toubro": "LT", "larsen & toubro": "LT", "airtel": "BHARTIARTL",
 }
 # Words dropped from SEC names: "ADVANCED MICRO DEVICES INC" -> "advanced micro devices".
 NAME_SUFFIXES = {"inc", "corp", "corporation", "co", "com", "company", "ltd", "plc", "platforms", "holdings",
@@ -44,6 +45,8 @@ WORD_TICKERS = {"PM", "SO", "DE", "LOW", "WELL", "COST"}
 
 YEAR = re.compile(r"(?:\bFY\s*'?|\b)(20\d{2})\b|\bFY\s*'?(\d{2})\b", re.IGNORECASE)  # 2024, FY2024, FY24
 YEAR_RANGE = re.compile(r"\b(20\d{2})\s*(?:-|–|to|through|until)\s*(20\d{2})\b", re.IGNORECASE)
+# 2024-25 and FY25-26 are named by the year they end. A bare 25-26 stays out: it could be anything.
+INDIAN_YEAR = re.compile(r"(?:\bFY\s*'?(?:20)?\d{2}|\b20\d{2})\s*[-–/]\s*(\d{2})\b", re.IGNORECASE)
 SINCE_YEAR = re.compile(r"\bsince\s+(?:fiscal\s+|FY\s*)?(20\d{2})\b", re.IGNORECASE)
 
 
@@ -92,6 +95,7 @@ def detect_companies(question: str, companies: dict[str, str]) -> list[str]:
 
 
 def detect_years(question: str, available_years: list[int]) -> list[int]:
+    question = INDIAN_YEAR.sub(r"20\1", question)
     years = set()
     for match in YEAR.finditer(question):
         years.add(int(match.group(1)) if match.group(1) else 2000 + int(match.group(2)))

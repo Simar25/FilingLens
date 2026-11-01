@@ -7,6 +7,7 @@ Run with:  python -m filinglens.build_index            (all companies)
 Reads the 'chunks' table made by `python -m filinglens.parse_reports`, so run
 that first. Each company's vectors are deleted and re-added, so re-running is
 safe and picks up any change in the chunks (same idea as database.replace_rows).
+shortcut: rewriting in place probably damaged the index once (docs/05 part 3). To start clean, delete data/processed/chroma first.
 
 The first run downloads the embedding model (~440 MB) from Hugging Face into data/models/.
 

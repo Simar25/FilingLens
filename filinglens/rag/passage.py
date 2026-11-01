@@ -20,8 +20,9 @@ class SearchResult:
     @property
     def section(self) -> str:
         # Reports without the usual Items have titles like "Report body (company's own layout)".
-        return self.title.split(" (")[0] if self.item in ("AR", "BODY") else f"Item {self.item} {self.title}"
+        return self.title.split(" (")[0] if self.item in ("AR", "BODY", "NSE") else f"Item {self.item} {self.title}"
 
     @property
     def label(self) -> str:
-        return f"{self.ticker} 10-K FY{self.fiscal_year}, {self.section}"
+        report = "annual report" if self.item == "NSE" else "10-K"
+        return f"{self.ticker} {report} FY{self.fiscal_year}, {self.section}"

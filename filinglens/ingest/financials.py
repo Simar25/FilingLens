@@ -20,6 +20,11 @@ The raw data has three traps, and this module handles each one:
 3. Restatements. Companies sometimes correct old numbers, so one year can show
    up in several filings with different values.
    -> We keep the most recently filed value.
+
+4. Stock splits. A 10-K only restates the last three years, so after a 10-for-1
+   split older years keep their pre-split earnings per share, and a chart shows
+   a crash that never happened.
+   -> We put every year on today's share basis (see stock_splits).
 """
 
 from dataclasses import dataclass
@@ -35,6 +40,7 @@ ANNUAL_FORMS = ("10-K", "10-K/A")
 # A fiscal year is 52 or 53 weeks long (364 or 371 days). This range allows for
 # that while filtering out quarterly (~91 day) and half-year numbers.
 MIN_YEAR_DAYS, MAX_YEAR_DAYS = 350, 380
+SPLIT_TOLERANCE = 0.03  # per-share figures are rounded to cents, so a 10-for-1 split can look like 10.2
 
 FINANCIALS_COLUMNS = [
     "ticker", "fiscal_year", "metric", "value", "unit",
@@ -54,10 +60,12 @@ METRICS: dict[str, Metric] = {
     # Fallbacks come last, so they only fill years where no earlier tag exists (Step 4's
     # 85 extra companies showed which ones are needed).
     "revenue": Metric(
-        ("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax",
-         "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet",
-         "RevenuesNetOfInterestExpense",              # banks: total net revenue (Wells Fargo, Goldman)
-         "RegulatedAndUnregulatedOperatingRevenue"),  # utilities (Xcel)
+        # The first two are always the income statement's total, so they beat "contract revenue",
+        # which leaves out a bank's interest income (American Express) and a utility's derivatives (NextEra).
+        ("RevenuesNetOfInterestExpense",              # banks: total net revenue
+         "RegulatedAndUnregulatedOperatingRevenue",   # utilities
+         "Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax",
+         "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet"),
         "USD", "duration"),
     "cost_of_revenue": Metric(("CostOfRevenue", "CostOfGoodsAndServicesSold"), "USD", "duration"),
     "gross_profit": Metric(("GrossProfit",), "USD", "duration"),
@@ -153,6 +161,25 @@ def fiscal_year_labels(facts: pd.DataFrame) -> tuple[dict[pd.Timestamp, int], di
     return year_by_period_end, year_by_accession
 
 
+def stock_splits(per_share: pd.DataFrame) -> list[tuple[pd.Timestamp, float]]:
+    """Each split as (first filing on the new basis, ratio): 10.0 for 10-for-1, 0.125 for a 1-for-8 reverse split.
+
+    A split shows up as one filing restating earlier years by the same whole ratio. At least two years must
+    agree, so a one-off restatement (a discontinued business, say) isn't mistaken for one.
+    shortcut: whole ratios only, so a 3-for-2 split is missed; none of the 99 companies had one since 2020.
+    """
+    rows = per_share.sort_values("filed").drop_duplicates(["end", "filed"])
+    rows = rows.assign(ratio=rows.groupby("end")["value"].shift() / rows["value"])
+    changed = rows[rows["ratio"].between(1.4, 100) | rows["ratio"].between(0.01, 0.7)]
+    splits = []
+    for filed, group in changed.groupby("filed"):
+        ratio = group["ratio"].median()
+        whole = round(ratio) if ratio >= 1 else 1 / round(1 / ratio)
+        if len(group) >= 2 and abs(ratio / whole - 1) < SPLIT_TOLERANCE:
+            splits.append((filed, whole))
+    return splits
+
+
 def extract_annual_financials(facts_json: dict, ticker: str) -> tuple[pd.DataFrame, dict[str, int]]:
     """Turn a companyfacts JSON into one row per (fiscal year, metric).
 
@@ -185,6 +212,9 @@ def extract_annual_financials(facts_json: dict, ticker: str) -> tuple[pd.DataFra
             .sort_values(["fiscal_year", "tag_rank", "filed"], ascending=[True, True, False])
             .drop_duplicates("fiscal_year")
         )
+        if metric.unit == "USD/shares":
+            for filed, ratio in stock_splits(candidates):
+                best = best.assign(value=best["value"].where(best["filed"] >= filed, best["value"] / ratio))
         picked.append(best.assign(metric=name, unit=metric.unit))
 
     if not picked:

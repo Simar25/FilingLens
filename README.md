@@ -1,18 +1,18 @@
 # FilingLens
 
-Ask questions about US companies' annual reports (10-Ks) and get answers that cite the filing they came from.
+Ask questions about the annual reports of 109 large companies, 99 American and 10 Indian, and get answers that cite the filing they came from.
 
 **[Try it live](https://filinglens-wc72wkjyoe8hnzm25azc7h.streamlit.app/)**. Name a company in your question: the free online version searches that company's reports, with a simpler search than the full version.
 
 Some questions need numbers ("compare NVIDIA's and AMD's gross margins since 2021"), some need the text ("what supply chain risks did Apple describe in 2024?"), and some need both ("how did Apple's R&D spending change, and why?"). FilingLens routes each question accordingly. Numbers come from SQL over a DuckDB database built from SEC XBRL data. Text comes from a search over the report passages, and the LLM answers only from the passages it was given, citing each one.
 
-The data: 594 10-K filings from 99 large US companies (fiscal years 2020 to 2025), split into about 190,000 passages, plus their financial statements and daily stock prices. All of it is free and public: SEC EDGAR for filings and financials, Yahoo Finance for prices and sectors.
+The data: 634 annual reports split into about 229,000 passages. 594 are 10-K filings from 99 large US companies (fiscal years 2020 to 2025), with their financial statements and daily stock prices. 40 are annual reports from 10 large Indian companies (fiscal years 2023 to 2026), searched page by page. All of it is free and public: SEC EDGAR for filings and financials, Yahoo Finance for prices and sectors, the National Stock Exchange of India for the Indian reports.
 
 I also used the same data for a small research study and a pilot on Indian annual reports, both described below.
 
 ![The FilingLens web app](docs/images/06_app_answer.png)
 
-The web app is a trading terminal with a lens: a magnifying lens over a market map of all 99 companies, and answers framed like the view through it, with every statement ticked and traced to its source. Why it looks like this: [docs/06_web_app.md](docs/06_web_app.md).
+The web app is a trading terminal with a lens: a magnifying lens over a market map of all 109 companies, and answers framed like the view through it, with every statement ticked and traced to its source. Why it looks like this: [docs/06_web_app.md](docs/06_web_app.md).
 
 ## How it works
 
@@ -63,11 +63,13 @@ Keyword search looks strong partly because the LLM-drafted questions reuse words
 |---|---|
 | Number answers with every expected value | 38 of 40 |
 | Right figure in "what happened, and why?" answers | 20 of 20 |
-| Router chose the right path | 85 of 86 |
+| Router chose the right path | 107 of 110 |
 | Cited sentences a second AI model confirmed | 96 of 105 (91%) |
 | Cost per question at list price | $0.0013 |
 
 Expected values come from the database, not from an LLM, and a different model did the grading. Text answers were all supported. Every unsupported sentence was in a mixed answer, where the model links a figure to a reason, and that's the weakest part of the system. One answer had the right figure and a wrong reason. Details, failures and the grader's own mistakes: [docs/05_evaluation.md](docs/05_evaluation.md).
+
+Those numbers are from before the latest fixes. A rerun on a small free model on a laptop GPU (`qwen2.5:7b`) got 27 of 40 number answers and 19 of 20 mixed answers, and 7 of 8 on questions written after the fixes. The model changed as well as the code, so that isn't a before-and-after: [Part 3](docs/05_evaluation.md#part-3-fixing-what-part-2-found) explains, including a wrong revenue tag and a damaged search index that the rerun exposed.
 
 ### Do changes in a 10-K predict stock returns?
 
@@ -79,9 +81,19 @@ There was no detectable effect. How much a company changed its Risk Factors sect
 
 Full results and robustness checks: [docs/04_research_findings.md](docs/04_research_findings.md).
 
+### Why these companies, and not every company?
+
+The 99 aren't a limit of the design. They're a sample chosen on purpose, for three reasons:
+
+1. **A fair rule.** They're the nine largest US-listed companies in each of Yahoo Finance's 11 sectors that filed a 10-K for every fiscal year from 2020 to 2025. A rule can't favour a result, and the research study needs six years of reports from every company. Foreign companies that file a 20-F and recent listings are left out by that rule.
+2. **Every score here was measured on them.** New companies bring new layouts: going from 14 companies to 99 exposed missing tags for banks and utilities, and 12 companies' MD&A sections still aren't found. Adding thousands without re-measuring would make these numbers untrue.
+3. **Free hosting.** The size grows with the number of companies. Measured from these 99, the roughly 5,000 US-listed companies would need about 9.6 million passages, 170 GB of filings, 155 GB of vectors and 4 GB of compressed reports online, on a free host with up to 2.7 GB of memory.
+
+What would change for all of them: the figures are the easy part, because SEC's data covers every filer in the same format. The reports would move to paid storage and a batch job would process them. A question stays fast, because it only searches the companies it names.
+
 ### India pilot
 
-Could the same approach work for NSE-listed companies, whose annual reports are PDFs with no standard layout? I tried 10 companies × 4 years. Downloading all 40 reports worked. Finding the MD&A automatically only partly did: the start and end were right in 14 of the 40, and at least the start in 26. That covered 3 of the 10 companies in every year. The next step would be to read each report's own table of contents. Details: [docs/04b_india_pilot.md](docs/04b_india_pilot.md).
+Could the same approach work for NSE-listed companies, whose annual reports are PDFs with no standard layout? I tried 10 companies × 4 years. Downloading all 40 reports worked. Finding the MD&A automatically only partly did: the start and end were right in 14 of the 40, and at least the start in 26. The app doesn't need that step, though: it searches every page and cites the page number, and on 10 test questions the live version found the right page in the top 5 for all 10 and answered all 10. These companies have no database figures, because their numbers are in rupees and the tables assume US dollars, so their answers come from the reports alone. Details: [docs/04b_india_pilot.md](docs/04b_india_pilot.md).
 
 ## Running it
 
@@ -152,7 +164,7 @@ tests/          offline tests on SEC-shaped sample data
 ## What's next
 
 - Make mixed answers quote their reasons, so an explanation can be checked word for word.
-- Fix earnings per share across stock splits ([details](docs/06_web_app.md#the-data-bug-found-along-the-way)).
+- Add the Indian companies' figures, in rupees and kept apart from the US dollar tables.
 
 ## Docs
 

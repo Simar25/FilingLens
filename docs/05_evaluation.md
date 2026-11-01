@@ -1,6 +1,6 @@
 # Step 5: measuring the search and the answers
 
-Part 1 measures the search and improves it. [Part 2](#part-2-measuring-the-answers), at the end, measures the answers.
+Part 1 measures the search and improves it. [Part 2](#part-2-measuring-the-answers) measures the answers. [Part 3](#part-3-fixing-what-part-2-found), at the end, fixes what Part 2 found and measures again on a free local model.
 
 ## Part 1: the search
 
@@ -170,7 +170,7 @@ python -m filinglens.ask --search-only --search vector "In Berkshire Hathaway's 
 | Number answers with every expected value | **38 of 40** | Values from the database, not from an LLM |
 | SQL result tables with every expected value | 39 of 40 | The same questions |
 | Mixed answers with the right figure | **20 of 20** | "What happened, and why?" questions |
-| Router chose the right path | **85 of 86** | 110 labelled questions planned; the last ones wait on the free tier |
+| Router chose the right path | **107 of 110** | Labelled questions. Two misses went to both paths, which still reads the reports; one went to the database alone |
 | Cited sentences a second AI model confirmed | **96 of 105 (91%)** | 39 text and mixed answers, one sentence at a time |
 | The same, text answers only | 25 of 25 | |
 | The same, mixed answers only | 71 of 80 (89%) | |
@@ -182,7 +182,7 @@ python -m filinglens.ask --search-only --search vector "In Berkshire Hathaway's 
 | Text | 2 | 4,100 | $0.0008 | 3 s |
 | Both | 3 | 9,900 | $0.0020 | 20 s |
 
-All of this was measured on the full system: hybrid search, on gpt-oss-120b. The online version uses keyword search and Gemini 3.5 Flash Lite, and hasn't been measured separately.
+All of this was measured on the full system: hybrid search, on gpt-oss-120b. The online version uses keyword search and Gemini 3.5 Flash Lite. Its search and figures are measured in `docs/06_web_app.md`, and its faithfulness hasn't been graded.
 
 ## How it was measured
 
@@ -219,8 +219,8 @@ Three number answers also did arithmetic against the rule (Coca-Cola's lead over
 2. **The grader isn't the truth.** It passed 25 of 25 in testing and still missed a real mistake. It also can't tell a correct explanation from one that's merely supported by a passage.
 3. **43 claims carry no citation.** Mostly bullets under a cited sentence, but nothing checks them.
 4. **Sign errors can pass.** The number check ignores minus signs, because answers write "a loss of $2 billion". I read all 40 number answers by hand and found none.
-5. **The database has a known bug.** Earnings per share is wrong across stock splits (`docs/06_web_app.md`), so those figures were kept out of the questions.
-6. **Free-tier limits.** Only 20 of the 50 text questions were answered in full, to stay within the daily tokens. The other 30 only test the router, and those are still finishing.
+5. **Earnings per share wasn't tested.** It was wrong across stock splits when these questions were written, so it was kept out of them. It's now fixed (`docs/01_data_pipeline.md`, Trap 4), but no question covers it yet.
+6. **Free-tier limits.** Only 20 of the 50 text questions were answered in full, to stay within the daily tokens. The other 30 only test the router.
 
 **Rerun part 2:**
 
@@ -239,3 +239,106 @@ python -m filinglens.evaluation.faithfulness
 - **What's the weakest part of the system?** Explaining why something changed. Text answers were fully supported, but all the unsupported sentences were in mixed answers, where the LLM links a figure to a reason.
 - **What does it cost?** About $1.27 per 1,000 questions at list price. A mixed question costs about twice a number question, because it reads eight passages too.
 - **What would you fix first?** Have the answer step quote its reason, so an explanation can be checked word for word.
+
+---
+
+# Part 3: fixing what Part 2 found
+
+**The question:** Part 2 found weaknesses. Did the fixes hold up, on questions nobody tuned them on?
+
+## What changed
+
+| Fix | Why |
+| --- | --- |
+| A figure check on every answer, with one rewrite if a figure isn't in the evidence (`combine.py`) | Telling the model to copy figures wasn't a guarantee: it rounded $16.05bn to $16.1bn |
+| Stricter rules for explaining a change | Every unsupported sentence in Part 2 was in an answer that linked a figure to a reason |
+| SQL rules, a worked example, and one retry when a column comes back empty | `WHERE` runs before `LAG`, so a filter on one year blanked the growth figure |
+| Earnings per share put on one share basis across stock splits | `docs/01_data_pipeline.md`, Trap 4 |
+| Income statement totals preferred over contract revenue | `docs/01_data_pipeline.md`, Trap 1. It corrected 18 values at American Express, NextEra and Duke |
+
+**Tried and dropped:** forcing "why" questions to search only the MD&A. Stated causes fell from 113 to 108, and Intel, Chevron and JPMorgan came back almost empty.
+
+## The result
+
+Groq's free tier allows about 200,000 tokens a day and a full run needs about 330,000, so this run used a free model on the laptop's GPU: `qwen2.5:7b`, which is far smaller than Part 2's `gpt-oss-120b`.
+
+| What was measured | Part 2: before the fixes, `gpt-oss-120b` | Part 3: after the fixes, `qwen2.5:7b` |
+| --- | --- | --- |
+| Number answers with every expected value | 38 of 40 | **27 of 40** |
+| SQL result tables with every expected value | 39 of 40 | 27 of 40 |
+| Mixed answers with the right figure | 20 of 20 | **19 of 20** |
+| Router chose the right path | 107 of 110 | 99 of 110, 5 of them harmful |
+| Fresh questions with the right figure | not asked | **18 of 19** |
+| Median time for a mixed question | 20 s, with free-tier waits | 28 s on an 8 GB laptop GPU |
+
+**This is not a before-and-after.** The model changed as well as the code, and the small model is the main reason for the fall in the left-hand rows. Its failures are mostly SQL it can't write: calendar years (0 of 2), multi-year calculations (2 of 5) and rankings (1 of 3). Comparing the fixes fairly needs the same model on both sides, and that run hasn't been done. What this table does show: the system stays usable on a free model that runs offline, and how much accuracy that costs. The README's headline numbers stay Part 2's, because the online app doesn't run this model.
+
+**Faithfulness on this run isn't finished.** Grading needs Gemini's free tier, which my grading used up, and the live app shares that key. The grades so far are in `eval/fresh_faithfulness_ollama.jsonl`. Each graded sentence is one request and visitors share the 500 a day, so the rest waits for the daily reset.
+
+## The fresh questions
+
+`eval/fresh_questions.jsonl` was written after the fixes, so they couldn't be tuned on it. That only stayed true for part of it, and the order matters:
+
+1. **The first 11 scored 3 of 11.** That's how the `WHERE` before `LAG` bug was found. After the fix they scored 10 of 11, but they aren't unseen any more.
+2. **Eight more were written, unseen.** They scored 7 of 8. **That's the honest number.**
+3. **The miss was the database's fault.** The answer said American Express grew 17%, and the expected value said 26%. Tracing it found the revenue bug, and the corrected figure is 17.4%. After the fix the score is 18 of 19, but that one point came from fixing what the question exposed, so it doesn't count as unseen.
+
+The remaining miss is Freeport: 60.6% where the database gives 60.9%.
+
+**A test can be wrong in either direction.** Here the expected value came from the database, and the database was wrong. A wrong answer may be a wrong test.
+
+## Bugs the small model found
+
+A weaker model makes more mistakes, so it reaches code paths a good model never does. Both of these crashed the app:
+
+| Bug | Fix |
+| --- | --- |
+| SQL the parser couldn't even split into words raised an error nobody caught | `check_sql` now treats it as an unsafe query, which retries |
+| Two result columns with one name crashed pandas | A clear error goes back to the model for a retry |
+
+## The damaged search index
+
+The run died at one test question, the same one every time, with no Python error, only `access violation` inside ChromaDB. Each step of the diagnosis removed one suspect:
+
+| Test | Result | So the cause isn't |
+| --- | --- | --- |
+| The same filter with a random vector | Worked | The filter |
+| The real vector with no filter | Crashed | Any filter |
+| Other questions, with the model loaded | Worked | The model, or the program's state |
+| That one vector, with PyTorch not loaded | Crashed | Anything but the index |
+
+Reading the stored vectors back then failed with "Error getting embedding". The first unreadable rows were Indian passages, the last ones added. So only searches whose path through the index reached the damage crashed, which is why it stayed hidden. The index had processed about 350,000 writes for 229,484 live passages, because each rebuild deleted and re-added vectors in place. I didn't trace the exact fault inside Chroma, so that cause is likely, not proven.
+
+**The repair.** `build_index` writes into the existing index, so re-running it would have kept the damage. Instead the readable vectors were copied into a new folder and the Indian passages embedded again from their text. Before the swap: all 229,484 passages present, none differing from the database, copied vectors unchanged apart from rounding (lowest cosine 0.9999996), and the crashing question working. Recall@5 was the same for all four search setups, and every vector search rank was unchanged.
+
+Part 1's table is from before the Indian passages were added. On the full index (`eval/search_results_after_india.csv`), keyword MRR is 0.79 and hybrid MRR is 0.79, because more passages change how rare each word counts as. Recall@5 didn't move.
+
+**The online app was never affected:** it doesn't use Chroma. To rebuild from nothing, delete `data/processed/chroma` and run `build_index`.
+
+## Limitations
+
+1. **The fixes aren't proven on the original model.** Only a run on `gpt-oss-120b` can show that.
+2. **18 of 19 isn't a clean score.** Use 7 of 8 for unseen questions, and 8 is small.
+3. **Faithfulness after the fixes is unknown** until the grading finishes.
+4. **Not every odd case was traced.** On this Windows laptop the app's server also crashes with an access violation when it's stopped after serving a visitor. It stayed healthy for 40 seconds after a visit, so visitors shouldn't see it, but the cause wasn't found, and the live app runs on a different system.
+
+**Rerun part 3:**
+
+```
+$env:LLM_PROVIDER="ollama"; $env:LLM_MODEL="qwen2.5:7b"
+python -m filinglens.evaluation.answer_eval --tag ollama
+python -m filinglens.evaluation.answer_eval --fresh --tag ollama
+
+$env:LLM_PROVIDER="gemini"; $env:LLM_MODEL="gemini-3.5-flash-lite"
+python -m filinglens.evaluation.faithfulness --fresh --tag ollama
+python -m filinglens.evaluation.faithfulness --tag ollama
+```
+
+## Interview questions, part 3
+
+- **Your score dropped from 38 to 27. Did your fixes make it worse?** I can't tell from this run, because I changed the model too. The drop is mostly a 7B model failing at SQL. To measure the fixes I'd need the same model on both sides, so I don't claim they raised the score.
+- **What's the difference between tuning data and unseen data here?** The first 11 fresh questions found a bug, so once I fixed it they stopped being unseen. I wrote 8 more, and 7 of 8 is the number I'd quote, though it's a small sample.
+- **Tell me about a bug your tests found in your data.** A test marked a correct answer wrong. The model read 17% from American Express's report and the database said 26%, because the code had picked a revenue tag that leaves out interest income. Auditing all 99 companies found two more with the same cause.
+- **How did you debug a crash with no error message?** I removed one suspect at a time: the filter, the query, the model, then everything but the index. It came down to one vector crashing an index with nothing else loaded.
+- **Why not just re-run the index build?** It writes into the existing index, so the damage would stay. I built a new index in a separate folder, checked it against the database, and only then swapped it in.
+- **Why use a weaker model at all?** It's free and has no daily limit, and its mistakes reached code paths a stronger model never hit. Two of the crashes it found could also have happened to a real user.

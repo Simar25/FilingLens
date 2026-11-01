@@ -31,7 +31,7 @@ Table financials_wide: one row per company and fiscal year. Use it for almost ev
   rnd_expense          DOUBLE    USD, research and development expense
   operating_income     DOUBLE    USD, operating income (negative = operating loss)
   net_income           DOUBLE    USD (negative = net loss)
-  eps_diluted          DOUBLE    USD per share, diluted earnings per share
+  eps_diluted          DOUBLE    USD per share, diluted earnings per share, on today's share count: years before a stock split are adjusted, so they can differ from the original report
   operating_cash_flow  DOUBLE    USD, cash from operating activities
   capex                DOUBLE    USD, capital expenditure (purchases of property and equipment), a positive number
   free_cash_flow       DOUBLE    USD, operating_cash_flow - capex
@@ -61,7 +61,7 @@ Table company_info: one row per company, labels from Yahoo Finance. Use it for q
   country VARCHAR, as_of DATE
   sector is one of: {sectors}
 
-Table filings: one row per 10-K annual report.
+Table filings: one row per annual report (form '10-K'). Form 'AR' is an Indian company's report: those 10 companies have no rows in financials_wide or prices.
   ticker, fiscal_year, form, filing_date DATE (the day it was made public), report_date DATE (last day of the fiscal
   year it covers), document_url VARCHAR
 

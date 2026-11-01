@@ -28,7 +28,7 @@ import pandas as pd
 
 from filinglens import llm
 from filinglens.config import DB_PATH
-from filinglens.evaluation.answer_eval import RESULTS_PATH as ANSWERS_PATH
+from filinglens.evaluation import answer_eval
 from filinglens.evaluation.answer_eval import load_results
 from filinglens.evaluation.draft_questions import EVAL_DIR
 from filinglens.rag.answer import find_citations
@@ -164,9 +164,15 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Grade whether the cited sources support the answers.")
     parser.add_argument("--check-grader", action="store_true", help="Test the grader on sentences with a known verdict")
     parser.add_argument("--summary", action="store_true", help="Only summarize the saved results")
+    parser.add_argument("--fresh", action="store_true", help="Grade the answers to the questions the fixes never saw")
+    parser.add_argument("--tag", default="", help="Grade the run saved under this tag, e.g. --tag ollama")
     args = parser.parse_args(argv)
     sys.stdout.reconfigure(errors="replace")
-    if not ANSWERS_PATH.exists():
+    global RESULTS_PATH
+    if args.fresh:
+        answer_eval.RESULTS_PATH, RESULTS_PATH = answer_eval.FRESH_RESULTS_PATH, EVAL_DIR / "fresh_faithfulness.jsonl"
+    answer_eval.RESULTS_PATH, RESULTS_PATH = answer_eval.tagged(answer_eval.RESULTS_PATH, args.tag), answer_eval.tagged(RESULTS_PATH, args.tag)
+    if not answer_eval.RESULTS_PATH.exists():
         sys.exit("No answers yet. Run  python -m filinglens.evaluation.answer_eval  first.")
     con = duckdb.connect(str(DB_PATH), read_only=True)
     try:

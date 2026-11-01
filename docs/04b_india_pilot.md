@@ -32,6 +32,18 @@ So simple rules give a clean MD&A for **3 of the 10 companies in every year** (1
 
 **What scaling up would take:** the 40 files came to 851 MB (median 13 MB per report; the largest, L&T's 2024-25 report, is 253 MB). 500 companies × 5 years would be roughly 30–50 GB and, at NSE's speed one file at a time, two to three days of downloading.
 
+## In the app (Step 6b)
+
+**What changed.** The pilot's aim was the MD&A, and that was its weakest step. The app doesn't need it: `filinglens/india/ingest.py` chunks every page of the 40 reports, 39,175 passages in all, and each passage keeps its page number, so an answer cites "INFY annual report FY2025, page 12".
+
+**No database figures, on purpose.** The tables and every prompt assume US dollars. Adding rupees would let a ranking compare ₹ crore with $ billions, which is a wrong answer that looks right. So a question that names only Indian companies skips the database and goes straight to the reports, and answers keep the report's own currency.
+
+**A bug only reading the data could find.** The PDFs draw the rupee sign with their own fonts, so the extracted text held other characters: `` `35,234 crore `` at Infosys, `¢ 2 lakh` at L&T, `E847,201 Mn` at Airtel. More than 3,000 passages across 9 companies were affected, and no test would have noticed. `fix_characters` restores them, and bullets drawn the same way.
+
+**Measured.** 10 questions, one per company, each written from a randomly chosen passage. The right page was in the top 5 for all 10 with the online keyword search, and 8 of 10 with hybrid search (the other two came 7th and 8th, still inside the 8 passages the LLM reads). The online version's answers held the expected fact in all 10. It's a small test: it shows the reports can be used, and it doesn't give a score to quote.
+
+**Limits.** 10.2% of these passages are over the embedding model's limit, mostly dense tables, so only their start is embedded; keyword search still reads all of them. Four years only. The 40 reports add 18 MB to the online data.
+
 ## What next (recommendation)
 
 1. **Read each report's own table of contents.** Most reports print one ("Management Discussion and Analysis ... 86") and print page numbers on their pages. Matching the two gives the MD&A's first and last page from the company's own declaration, whatever its design. This is the most promising general fix.

@@ -31,7 +31,7 @@
 .st-key-map summary { padding: 0.25rem 0.6rem; background: var(--panel); }
 .st-key-map summary p { color: var(--amber); font-size: 0.8125rem; font-weight: 600; }
 .st-key-map [data-testid="stExpanderDetails"] { padding: 0.5rem 0.6rem 0.4rem; }
-.board { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 3px; min-width: 900px; }
+.board { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; min-width: 900px; }
 .sector h4 { color: var(--amber); font-family: inherit; font-size: 0.6875rem; font-weight: 600; padding: 0 0 0.2rem; margin: 0; white-space: nowrap; }
 .square { display: flex; justify-content: space-between; align-items: baseline; padding: 0.2rem 0.28rem; margin-bottom: 2px; color: #FFFFFF !important; text-decoration: none !important; font-size: 0.71875rem; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .square b { font-weight: 600; }

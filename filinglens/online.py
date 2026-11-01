@@ -59,10 +59,11 @@ class OnlineAssistant(Assistant):
 
     def search(self, question: str, filters: Filters, k: int = 8, mode: str = "keyword") -> list[SearchResult]:
         if not filters.tickers:
-            raise SetupError("Name one of the 99 companies on the market map in your question, for example: "
+            raise SetupError(f"Name one of the {len(self.companies)} companies on the market map in your question, for example: "
                              "What supply chain risks did Apple describe in 2024?")
         years = filters.years or self.report_years
-        wanted = [(ticker, year) for ticker in filters.tickers for year in years][:MAX_REPORTS]
+        wanted = [(ticker, year) for ticker in filters.tickers for year in years
+                  if (REPORTS_DIR / f"{ticker}-{year}.json.gz").exists()][:MAX_REPORTS]
         passages = [passage for ticker, year in wanted for passage in load_report(ticker, year)]
         if not passages:
             return []
@@ -94,7 +95,12 @@ def main() -> None:
     con.close()
     for (ticker, year), group in rows.groupby(["ticker", "fiscal_year"]):
         report = {"company": group["name"].iat[0], "passages": group[["chunk_id", "item", "title", "text"]].values.tolist()}
-        with gzip.open(REPORTS_DIR / f"{ticker}-{year}.json.gz", "wt", encoding="utf-8", compresslevel=9) as f:
+        path = REPORTS_DIR / f"{ticker}-{year}.json.gz"
+        if path.exists():
+            with gzip.open(path, "rt", encoding="utf-8") as f:
+                if json.load(f) == report:
+                    continue  # gzip output differs on every write, and each rewrite would add 80 MB to the repository
+        with gzip.open(path, "wt", encoding="utf-8", compresslevel=9) as f:
             json.dump(report, f, ensure_ascii=False, separators=(",", ":"))
     size = sum(p.stat().st_size for p in REPORTS_DIR.iterdir()) / 1e6
     print(f"{rows.groupby(['ticker', 'fiscal_year']).ngroups} reports, {size:.0f} MB; "
