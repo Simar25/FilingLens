@@ -65,6 +65,8 @@ class Assistant:
         """`generate` is llm.generate (or a fake one in tests)."""
         self.con = connect_readonly(db_path)
         self.generate = generate
+        # SQL is where a local model goes wrong and where thinking pays (docs/05 part 3); it's slow, so nowhere else.
+        self.generate_sql = llm.generate_thinking if generate is llm.generate else generate
         self.companies = dict(self.con.execute("SELECT ticker, name FROM companies").fetchall())
         self.report_years = [y for (y,) in self.con.execute("SELECT DISTINCT fiscal_year FROM chunks ORDER BY 1")
                              .fetchall()]
@@ -98,6 +100,12 @@ class Assistant:
         if items:
             filters.items = [i.upper() for i in items]
         return filters
+
+    def schema_for(self, question: str, tickers=None) -> str:
+        """The company list is over half the prompt, and thinking on top of it overflows a local model's window."""
+        if llm.current_settings()[0] != "ollama":
+            return self.schema
+        return describe_schema(self.con, self.filters_for(question, tickers).tickers)
 
     def search(self, question: str, filters: Filters, k: int = 8, mode: str = DEFAULT_SEARCH) -> list[SearchResult]:
         """The k best report passages. `mode` is one of SEARCH_MODES (compared in docs/05_evaluation.md)."""
@@ -153,7 +161,7 @@ class Assistant:
         if not route and named and named <= self.reports_only:
             path = "text"  # their figures are in the reports, so the database would only find nothing
         if path in ("numbers", "both"):
-            response.sql = text_to_sql(question, self.schema, self.con, self.generate)
+            response.sql = text_to_sql(question, self.schema_for(question, tickers), self.con, self.generate_sql)
             response.calls += [("SQL" if i == 0 else "SQL retry", r) for i, r in enumerate(response.sql.replies)]
             if path == "numbers" and not route and response.sql.cannot_answer and self.filters_for(question, tickers).tickers:
                 path, response.read_reports_instead = "text", True  # a report question sent to the database (Step 5)

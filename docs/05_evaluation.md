@@ -260,20 +260,53 @@ python -m filinglens.evaluation.faithfulness
 
 ## The result
 
-Groq's free tier allows about 200,000 tokens a day and a full run needs about 330,000, so this run used a free model on the laptop's GPU: `qwen2.5:7b`, which is far smaller than Part 2's `gpt-oss-120b`.
+Groq's free tier allows about 200,000 tokens a day and a full run needs about 330,000, so these runs used free models on the laptop's GPU. `qwen2.5:7b` came first. `qwen3:8b` replaced it after [the work below](#making-the-local-model-better). Both are far smaller than Part 2's `gpt-oss-120b`.
 
-| What was measured | Part 2: before the fixes, `gpt-oss-120b` | Part 3: after the fixes, `qwen2.5:7b` |
+| What was measured | Part 2: before the fixes, `gpt-oss-120b` | After the fixes, `qwen2.5:7b` | After the fixes, `qwen3:8b` |
+| --- | --- | --- | --- |
+| Number answers with every expected value | 38 of 40 | 27 of 40 | **36 of 40** |
+| SQL result tables with every expected value | 39 of 40 | 27 of 40 | 37 of 40 |
+| Mixed answers with the right figure | 20 of 20 | 19 of 20 | **19 of 20** |
+| Router chose the right path | 107 of 110 | 99 of 110, 5 of them harmful | 106 of 110, 3 of them harmful |
+| Fresh mixed questions with the right figure | not asked | 18 of 19 | **18 of 19** |
+| 12 new hard number questions | not asked | 6 of 12 | **12 of 12** |
+| Cited sentences a second model confirmed | 96 of 105 (91%) | grading not finished | **66 of 76 (87%)**, and 41 of 46 (89%) on the fresh questions |
+| Median time for a mixed question | 20 s, with free-tier waits | 28 s on an 8 GB laptop GPU | 56 s on the same GPU |
+
+**This is not a before-and-after of the fixes.** The model changed as well as the code. Comparing the fixes fairly needs the same model on both sides, and that run hasn't been done. What this table does show: the system works on a free model that runs offline, and how much accuracy that costs. The README's headline numbers stay Part 2's, because the online app doesn't run these models.
+
+**Grading.** Gemini graded Part 2 because Groq wrote those answers. These answers came from a local model, so Groq can grade them without marking its own work, and it doesn't share the live app's quota. It scored 25 of 25 on the grader test, the same as Gemini. Groq's daily limit stopped it after 13 of the 19 fresh answers, so Gemini graded the last 6. The two graders' scores aren't strictly comparable, so read 87% next to 91% as "about the same", not as a 4-point fall.
+
+**Reading the unsupported sentences.** The grader marked 10 of the 76. I read them against their sources. Four are clearly real mistakes: Chevron's fall in income used to explain a fall in revenue (m05), a reason cited to a table that doesn't show it (m12), a figure more precise than the table gives (m19), and Merck's wrong reason again, with a different reason from Part 2's (m20). The other six aren't settled.
+
+## Making the local model better
+
+All 13 number failures on `qwen2.5:7b` were SQL: 10 queries that ran but were wrong, and 3 that never ran. One change was made at a time, and each was measured.
+
+**1. A model that can think, for SQL only.** `qwen3:8b` can reason before it answers. On the SQL step alone, on those 13 questions:
+
+| | Right | Median time per query |
 | --- | --- | --- |
-| Number answers with every expected value | 38 of 40 | **27 of 40** |
-| SQL result tables with every expected value | 39 of 40 | 27 of 40 |
-| Mixed answers with the right figure | 20 of 20 | **19 of 20** |
-| Router chose the right path | 107 of 110 | 99 of 110, 5 of them harmful |
-| Fresh questions with the right figure | not asked | **18 of 19** |
-| Median time for a mixed question | 20 s, with free-tier waits | 28 s on an 8 GB laptop GPU |
+| Thinking off | 6 of 13 | 5 s |
+| Thinking on | **11 of 13** | 45 s |
 
-**This is not a before-and-after.** The model changed as well as the code, and the small model is the main reason for the fall in the left-hand rows. Its failures are mostly SQL it can't write: calendar years (0 of 2), multi-year calculations (2 of 5) and rankings (1 of 3). Comparing the fixes fairly needs the same model on both sides, and that run hasn't been done. What this table does show: the system stays usable on a free model that runs offline, and how much accuracy that costs. The README's headline numbers stay Part 2's, because the online app doesn't run this model.
+Thinking lost nothing and fixed five more. It stays off for the router and the written answer, because that's where it would add minutes and nothing failed there. Online models are untouched: they already think, at the levels set in `llm.py`.
 
-**Faithfulness on this run isn't finished.** Grading needs Gemini's free tier, which my grading used up, and the live app shares that key. The grades so far are in `eval/fresh_faithfulness_ollama.jsonl`. Each graded sentence is one request and visitors share the 500 a day, so the rest waits for the daily reset.
+**2. Thinking overflowed the context window.** The SQL prompt was about 5,330 tokens, and long thinking took two questions past the 8,192 window. Ollama doesn't report that, and the old check only looked at the prompt. The obvious fix was a bigger window, so I measured it:
+
+| Window | On the GPU | Speed |
+| --- | --- | --- |
+| 8,192 | 100% | 38 tokens/s |
+| 10,240 | 92% | 29 tokens/s |
+| 12,288 | 87% | 19.5 tokens/s |
+
+Once any of the model spills to the CPU, speed falls quickly. So the prompt shrank instead. The list of every company was 3,123 of its 5,315 tokens, and a question needs only the companies it names. On Ollama the prompt is now about 2,270 tokens, and the check counts the reply too. Groq's and Gemini's prompts are unchanged, because they can't be measured again within their free limits.
+
+**3. A limit on replies.** During the full run one SQL call was still running after 10 minutes, and the timeout crashed the run. Rerun alone, that question took 37 s and came back right, so **the cause isn't known**. It could be endless thinking or a stall in Ollama. Replies are now capped at 4,096 tokens (the longest of 49 normal ones was 3,554), a reply that never finishes thinking is asked again without thinking, and a timeout shows a clear error instead of a crash.
+
+**4. Dropped, with reasons.** Database views for calendar years and returns would have changed the live data to help at most 2 questions. Choosing worked examples per question isn't needed now the prompt fits. Treating `[1]` as `[DB]` isn't needed either: invalid citations fell from 33 answers to 1 of 80 without it.
+
+**The 5 remaining misses.** Two are the scoring being strict, and they stay counted as wrong: 377.3% for a ratio of 3.77 (n18), and $0.37bn for $0.365bn (m20). Three are real: rounding before averaging (n30), the wrong fiscal year for a calendar year (n33), and a right table that the answer step said didn't hold the figure (n32).
 
 ## The fresh questions
 
@@ -286,6 +319,25 @@ Groq's free tier allows about 200,000 tokens a day and a full run needs about 33
 The remaining miss is Freeport: 60.6% where the database gives 60.9%.
 
 **A test can be wrong in either direction.** Here the expected value came from the database, and the database was wrong. A wrong answer may be a wrong test.
+
+**These 19 can't tell the two local models apart.** Both scored 18 of 19, because every one is a simple one-year growth question. And 36 of 40 isn't an unseen score, because 13 of those 40 chose the thinking setup. So I wrote 12 new number questions, `f20` to `f31`, with expected values from hand-written SQL: 3 calendar-year, 3 multi-year, 2 ranking, 2 comparison, 1 ratio and 1 stock return. No change was tuned on them, and both models ran them on the same code:
+
+| | Answers right | Result tables right | Median seconds |
+| --- | --- | --- | --- |
+| `qwen2.5:7b` | 6 of 12 | 3 of 12 | 21 |
+| `qwen3:8b` | **12 of 12** | 12 of 12 | 61 |
+
+**That's the number to quote for the local model, and 12 is a small test.** I also chose the question types after seeing where the small model was weak, so they're hard on purpose, not a random sample.
+
+**The score only checks figures, so I read all 12 answers.** `qwen3:8b`'s tables and figures are all right, with no figure outside the table, but 3 of the 12 answers are worded badly:
+
+- f20 gives Oracle's right figure, then says the database doesn't include calendar 2022.
+- f22 gives Lowe's right figure, then says it's for the fiscal year and not the calendar year.
+- f31 gets Microsoft's return right, then adds a reason "as noted in the annual report", with no report behind it. The number route has no sources, so nothing checks that sentence.
+
+So 12 of 12 means the figures, not the answers. Calendar questions are the weak spot: the answer step doesn't always accept that a fiscal year can stand for a calendar year, which is also what went wrong on n32.
+
+`qwen2.5:7b`'s 6 of 12 flatters it the other way. Three of those passed without a right table: one took its figure from the report text (f22), one did the subtraction itself from a broken table (f29), and one had the right difference next to two wrong revenue figures (f28), which the score doesn't look at.
 
 ## Bugs the small model found
 
@@ -318,26 +370,32 @@ Part 1's table is from before the Indian passages were added. On the full index 
 ## Limitations
 
 1. **The fixes aren't proven on the original model.** Only a run on `gpt-oss-120b` can show that.
-2. **18 of 19 isn't a clean score.** Use 7 of 8 for unseen questions, and 8 is small.
-3. **Faithfulness after the fixes is unknown** until the grading finishes.
-4. **Not every odd case was traced.** On this Windows laptop the app's server also crashes with an access violation when it's stopped after serving a visitor. It stayed healthy for 40 seconds after a visit, so visitors shouldn't see it, but the cause wasn't found, and the live app runs on a different system.
+2. **18 of 19 isn't a clean score.** Use 7 of 8 for unseen questions on `qwen2.5:7b`, and 12 of 12 on `qwen3:8b`. Both samples are small, and the second counts figures only: 3 of those 12 answers are worded badly. The calendar wording problem isn't fixed, because the fix would change the prompt the live app uses, and that can't be measured again within the free limits.
+3. **Faithfulness used two graders,** and six of the ten sentences marked unsupported weren't read to a conclusion. `qwen2.5:7b`'s grading was left unfinished, because that model was replaced.
+4. **It needs a lot of memory.** With the model and the search index loaded, about 1 GB of 15.6 GB stayed free, and the first resumed run was stopped for low memory. `llama-server` reserved 14.2 GB for a 5.2 GB model, and I didn't find out why.
+5. **One hang wasn't explained.** The limits stop it from blocking a run, but it didn't happen again, so they weren't tested on a real hang.
+6. **Not every odd case was traced.** On this Windows laptop the app's server also crashes with an access violation when it's stopped after serving a visitor. It stayed healthy for 40 seconds after a visit, so visitors shouldn't see it, but the cause wasn't found, and the live app runs on a different system.
 
 **Rerun part 3:**
 
 ```
-$env:LLM_PROVIDER="ollama"; $env:LLM_MODEL="qwen2.5:7b"
-python -m filinglens.evaluation.answer_eval --tag ollama
-python -m filinglens.evaluation.answer_eval --fresh --tag ollama
+$env:LLM_PROVIDER="ollama"; $env:LLM_MODEL="qwen3:8b"
+python -m filinglens.evaluation.answer_eval --tag qwen3
+python -m filinglens.evaluation.answer_eval --fresh --tag qwen3
 
-$env:LLM_PROVIDER="gemini"; $env:LLM_MODEL="gemini-3.5-flash-lite"
-python -m filinglens.evaluation.faithfulness --fresh --tag ollama
-python -m filinglens.evaluation.faithfulness --tag ollama
+$env:LLM_PROVIDER="groq"; $env:LLM_MODEL="openai/gpt-oss-120b"
+python -m filinglens.evaluation.faithfulness --check-grader
+python -m filinglens.evaluation.faithfulness --tag qwen3
+python -m filinglens.evaluation.faithfulness --fresh --tag qwen3
 ```
 
 ## Interview questions, part 3
 
 - **Your score dropped from 38 to 27. Did your fixes make it worse?** I can't tell from this run, because I changed the model too. The drop is mostly a 7B model failing at SQL. To measure the fixes I'd need the same model on both sides, so I don't claim they raised the score.
-- **What's the difference between tuning data and unseen data here?** The first 11 fresh questions found a bug, so once I fixed it they stopped being unseen. I wrote 8 more, and 7 of 8 is the number I'd quote, though it's a small sample.
+- **What's the difference between tuning data and unseen data here?** The first 11 fresh questions found a bug, so once I fixed it they stopped being unseen. Later, 13 of the 40 number questions chose the thinking setup, so 36 of 40 isn't unseen either. I wrote 12 harder questions and ran both models on them: 12 of 12 against 6 of 12. It's a small sample, I chose the hard question types on purpose, and when I read the answers 3 of the 12 were worded badly even though the figures were right.
+- **How did you get a laptop model from 27 to 36 of 40?** Every failure was SQL, so I targeted that step only. I moved to a model that can reason first, and let it reason only when writing SQL, because that's where the errors were and thinking costs ten times the time.
+- **Thinking overflowed the context window. Why not just make the window bigger?** I measured that: going from 8,192 to 12,288 tokens pushed part of the model onto the CPU and halved the speed. The list of every company was over half the prompt, so the local model now sees only the companies a question names.
+- **Why did you switch grader?** The rule is that a model never grades its own work. Gemini was chosen because Groq wrote Part 2's answers. A local model wrote these, so that reason no longer held. I tested Groq on the same 25 known sentences before trusting it.
 - **Tell me about a bug your tests found in your data.** A test marked a correct answer wrong. The model read 17% from American Express's report and the database said 26%, because the code had picked a revenue tag that leaves out interest income. Auditing all 99 companies found two more with the same cause.
 - **How did you debug a crash with no error message?** I removed one suspect at a time: the filter, the query, the model, then everything but the index. It came down to one vector crashing an index with nothing else loaded.
 - **Why not just re-run the index build?** It writes into the existing index, so the damage would stay. I built a new index in a separate folder, checked it against the database, and only then swapped it in.

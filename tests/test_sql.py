@@ -139,6 +139,13 @@ def test_schema_lists_companies_fiscal_year_ends_and_metrics(con):
     assert "sector is one of: 'Technology'" in schema  # real values, so the LLM doesn't guess 'Tech'
 
 
+def test_schema_can_list_only_the_named_companies(con):
+    named = describe_schema(con, only=["NVDA"])
+    assert "NVDA: NVIDIA CORP (FY2023 ended 2023-01-29)" in named
+    assert len(named) < len(describe_schema(con))
+    assert "NVDA:" not in describe_schema(con, only=[])  # a sector question names none, and joins company_info
+
+
 # ---------- 3.2 text-to-SQL ----------
 
 def test_extract_sql_from_code_block_or_bare_text():

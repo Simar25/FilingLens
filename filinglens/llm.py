@@ -12,7 +12,7 @@ Which model answers is a setting in .env, so you can switch without touching cod
   LLM_PROVIDER=ollama   A free model running on your own GPU through Ollama (ollama.com).
                         No daily limits, but slower and less accurate.
   LLM_MODEL=...         Optional: use a different model than the default below, e.g.
-                        gemini-3.5-flash-lite, openai/gpt-oss-20b (Groq) or qwen2.5:7b (Ollama).
+                        gemini-3.5-flash-lite, openai/gpt-oss-20b (Groq) or qwen2.5:7b (Ollama, a smaller model).
 """
 
 import os
@@ -25,7 +25,7 @@ from dotenv import load_dotenv
 
 from filinglens.config import PROJECT_ROOT
 
-DEFAULT_MODELS = {"gemini": "gemini-3.8-flash", "groq": "openai/gpt-oss-120b", "ollama": "llama3.1:8b"}
+DEFAULT_MODELS = {"gemini": "gemini-3.8-flash", "groq": "openai/gpt-oss-120b", "ollama": "qwen3:8b"}
 # Gemini and gpt-oss "think" before answering, which costs time and counts against the
 # free-tier token limits. Answering from a handful of given passages doesn't
 # need deep reasoning: low is enough.
@@ -66,6 +66,11 @@ OLLAMA_URL = "http://localhost:11434"
 # Ollama's default context window is small, and longer prompts are cut from the
 # START without any error, which would silently drop the first sources.
 OLLAMA_CONTEXT_TOKENS = 8192
+# Ollama refuses `think` for models without a thinking mode, and these think unless told not to.
+OLLAMA_THINKING_MODELS = ("qwen3",)
+# Thinking has no end of its own: on 2026-11-02 one question was still thinking after 10 minutes.
+# The longest of 49 normal SQL replies was 3,554 tokens.
+OLLAMA_MAX_REPLY_TOKENS = 4096
 
 
 class LLMError(RuntimeError):
@@ -95,7 +100,8 @@ def current_settings() -> tuple[str, str]:
     return provider, model
 
 
-def generate(system: str, prompt: str) -> LLMReply:
+def generate(system: str, prompt: str, think: bool = False) -> LLMReply:
+    """`think` only matters on Ollama: the online models always think, at the levels set above."""
     provider, model = current_settings()
     start = time.perf_counter()
     if provider == "gemini":
@@ -103,8 +109,12 @@ def generate(system: str, prompt: str) -> LLMReply:
     elif provider == "groq":
         text, n_in, n_out = _generate_groq(model, system, prompt)
     else:
-        text, n_in, n_out = _generate_ollama(model, system, prompt)
+        text, n_in, n_out = _generate_ollama(model, system, prompt, think)
     return LLMReply(clean_text(text), model, n_in, n_out, time.perf_counter() - start)
+
+
+def generate_thinking(system: str, prompt: str) -> LLMReply:
+    return generate(system, prompt, think=True)
 
 
 def clean_text(text: str) -> str:
@@ -268,14 +278,20 @@ def _groq_error(response: requests.Response, model: str) -> LLMError:
 
 # ---------- Ollama ----------
 
-def _generate_ollama(model: str, system: str, prompt: str) -> tuple[str, int, int]:
+def _generate_ollama(model: str, system: str, prompt: str, think: bool = False) -> tuple[str, int, int]:
+    body = {
+        "model": model,
+        "stream": False,
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+        "options": {"num_ctx": OLLAMA_CONTEXT_TOKENS, "num_predict": OLLAMA_MAX_REPLY_TOKENS, "temperature": 0},
+    }
+    if model.startswith(OLLAMA_THINKING_MODELS):
+        body["think"] = think
     try:
-        response = requests.post(f"{OLLAMA_URL}/api/chat", timeout=600, json={
-            "model": model,
-            "stream": False,
-            "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
-            "options": {"num_ctx": OLLAMA_CONTEXT_TOKENS, "temperature": 0},
-        })
+        response = requests.post(f"{OLLAMA_URL}/api/chat", timeout=600, json=body)
+    except requests.Timeout:
+        raise LLMError(f"Ollama didn't finish within 10 minutes. The model '{model}' may be too big for this "
+                       "computer: try a smaller one in LLM_MODEL.") from None
     except requests.ConnectionError:
         raise LLMError("Can't reach Ollama. Install it from https://ollama.com, make sure it's running, "
                        f"then download the model once with:  ollama pull {model}") from None
@@ -283,6 +299,10 @@ def _generate_ollama(model: str, system: str, prompt: str) -> tuple[str, int, in
         raise LLMError(f"Ollama doesn't have the model '{model}' yet. Download it with:  ollama pull {model}")
     response.raise_for_status()
     data = response.json()
-    if data.get("prompt_eval_count", 0) >= OLLAMA_CONTEXT_TOKENS:
-        raise LLMError("The prompt is longer than Ollama's context window; ask with fewer sources (-k).")
+    if think and not data["message"]["content"].strip():  # the limit came before it finished thinking
+        text, n_in, n_out = _generate_ollama(model, system, prompt)
+        return text, n_in, n_out + data.get("eval_count", 0)
+    if data.get("prompt_eval_count", 0) + data.get("eval_count", 0) >= OLLAMA_CONTEXT_TOKENS:
+        raise LLMError("The prompt and reply didn't fit Ollama's context window, so part of the prompt was lost; "
+                       "ask with fewer sources (-k).")
     return data["message"]["content"], data.get("prompt_eval_count", 0), data.get("eval_count", 0)

@@ -300,6 +300,50 @@ def test_groq_prompt_too_large_suggests_fewer_passages(monkeypatch):
         llm.generate("system", "prompt")
 
 
+def ollama_reply(prompt_tokens=5000, reply_tokens=100):
+    return 200, {"message": {"content": "the answer"}, "prompt_eval_count": prompt_tokens, "eval_count": reply_tokens}, None
+
+
+def test_ollama_think_only_goes_to_models_that_have_it(monkeypatch):
+    fake = FakeGroq(monkeypatch, ollama_reply(), ollama_reply(), ollama_reply())
+    monkeypatch.setenv("LLM_PROVIDER", "ollama")
+    monkeypatch.setenv("LLM_MODEL", "qwen3:8b")
+    llm.generate_thinking("system", "prompt")
+    llm.generate("system", "prompt")  # must say no: these models think unless told not to
+    monkeypatch.setenv("LLM_MODEL", "qwen2.5:7b")
+    llm.generate_thinking("system", "prompt")  # Ollama would refuse it
+    assert [r.get("think") for r in fake.requests] == [True, False, None]
+
+
+def test_ollama_thinking_past_the_context_window_is_refused(monkeypatch):
+    # Seen on 2026-11-02: a 5,300-token prompt fitted, then long thinking pushed the total past the window.
+    FakeGroq(monkeypatch, ollama_reply(5000, llm.OLLAMA_CONTEXT_TOKENS - 4999))
+    monkeypatch.setenv("LLM_PROVIDER", "ollama")
+    monkeypatch.setenv("LLM_MODEL", "qwen3:8b")
+    with pytest.raises(llm.LLMError, match="context window"):
+        llm.generate_thinking("system", "prompt")
+
+
+def test_ollama_that_never_finishes_thinking_answers_without_it(monkeypatch):
+    unfinished = (200, {"message": {"content": ""}, "prompt_eval_count": 2300, "eval_count": 4096}, None)
+    fake = FakeGroq(monkeypatch, unfinished, ollama_reply(2300, 60))
+    monkeypatch.setenv("LLM_PROVIDER", "ollama")
+    monkeypatch.setenv("LLM_MODEL", "qwen3:8b")
+    reply = llm.generate_thinking("system", "prompt")
+    assert (reply.text, reply.output_tokens) == ("the answer", 4156)
+    assert [r["think"] for r in fake.requests] == [True, False]
+
+
+def test_ollama_timeout_is_a_clear_error(monkeypatch):
+    def post(*args, **kwargs):
+        raise llm.requests.Timeout
+    monkeypatch.setattr(llm.requests, "post", post)
+    monkeypatch.setenv("LLM_PROVIDER", "ollama")
+    monkeypatch.setenv("LLM_MODEL", "qwen3:8b")
+    with pytest.raises(llm.LLMError, match="didn't finish"):
+        llm.generate("system", "prompt")
+
+
 def test_model_quirks_are_cleaned():
     # What gpt-oss on Groq really sent on 2026-10-19 (plus its longer citation form).
     raw = ("fiscal\u202f2024, **$108.81\u202fbillion**\u3010DB\u3011 because of year\u2011over\u2011year "

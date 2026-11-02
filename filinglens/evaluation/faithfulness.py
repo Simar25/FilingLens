@@ -7,8 +7,9 @@ An LLM grader can be wrong too, so it's tested before its scores are believed:
 eval/grader_check.jsonl holds sentences with a known verdict, half of them made wrong on
 purpose (a changed figure, a passage that doesn't say it). The grader must catch those.
 
-The answers come from Groq, so run this with another provider. Then the model doesn't grade
-itself, and the free-tier tokens of the answers are spared. One command per terminal:
+Grade with a different model from the one that wrote the answers, so no model marks its own
+work: Gemini for Groq's answers, Groq for a local model's. The live app shares the Gemini key,
+so grading on Gemini can use up what visitors need. One command per terminal:
 
   $env:LLM_PROVIDER="gemini"; $env:LLM_MODEL="gemini-3.5-flash-lite"
   python -m filinglens.evaluation.faithfulness --check-grader

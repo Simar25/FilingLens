@@ -69,7 +69,7 @@ Keyword search looks strong partly because the LLM-drafted questions reuse words
 
 Expected values come from the database, not from an LLM, and a different model did the grading. Text answers were all supported. Every unsupported sentence was in a mixed answer, where the model links a figure to a reason, and that's the weakest part of the system. One answer had the right figure and a wrong reason. Details, failures and the grader's own mistakes: [docs/05_evaluation.md](docs/05_evaluation.md).
 
-Those numbers are from before the latest fixes. A rerun on a small free model on a laptop GPU (`qwen2.5:7b`) got 27 of 40 number answers and 19 of 20 mixed answers, and 7 of 8 on questions written after the fixes. The model changed as well as the code, so that isn't a before-and-after: [Part 3](docs/05_evaluation.md#part-3-fixing-what-part-2-found) explains, including a wrong revenue tag and a damaged search index that the rerun exposed.
+Those numbers are from before the latest fixes, on a large cloud model. It also runs for free on a laptop's 8 GB GPU. `qwen2.5:7b` got 27 of 40 number answers. `qwen3:8b`, which reasons before it writes SQL, got 36 of 40, 19 of 20 mixed answers and 87% of cited sentences confirmed. On 12 new hard questions neither had seen, it got the right figure on all 12 against 6 of 12. That's a small test, and 3 of those 12 answers were worded badly. The model changed as well as the code, so none of this is a before-and-after of the fixes: [Part 3](docs/05_evaluation.md#part-3-fixing-what-part-2-found) explains, including a wrong revenue tag and a damaged search index that the reruns exposed.
 
 ### Do changes in a 10-K predict stock returns?
 

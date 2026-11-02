@@ -86,8 +86,9 @@ NOTES = """\
 - A stock's return over a period runs from the last close BEFORE the period starts to the last close in the period."""
 
 
-def describe_schema(con: duckdb.DuckDBPyConnection) -> str:
-    """The text the LLM reads before writing SQL: tables, columns, units, plus facts from the data."""
+def describe_schema(con: duckdb.DuckDBPyConnection, only: list[str] | None = None) -> str:
+    """The text the LLM reads before writing SQL: tables, columns, units, plus facts from the data.
+    `only` lists just those companies, for a model whose context window can't hold all of them."""
     metrics = [row[0] for row in con.execute("SELECT DISTINCT metric FROM financials ORDER BY 1").fetchall()]
     companies = con.execute("""
         SELECT c.ticker, c.name, MAX(f.fiscal_year) AS last_year, MAX(f.report_date) AS last_year_end
@@ -100,8 +101,11 @@ def describe_schema(con: duckdb.DuckDBPyConnection) -> str:
         "SELECT DISTINCT sector FROM company_info WHERE sector IS NOT NULL ORDER BY 1").fetchall()]
 
     tables = TABLES.format(metrics=", ".join(metrics), sectors=", ".join(sectors) or "(no labels downloaded yet)")
-    lines = [tables, "", "Companies (ticker: SEC name, when its fiscal year ends):"]
+    heading = "Companies" if only is None else "Companies named in this question (the database has many more)"
+    lines = [tables, "", f"{heading} (ticker: SEC name, when its fiscal year ends):"]
     for ticker, name, year, year_end in companies:
+        if only is not None and ticker not in only:
+            continue
         ends = f"FY{year} ended {year_end}" if year_end else "no reports"
         lines.append(f"  {ticker}: {name} ({ends})")
     lines += [
